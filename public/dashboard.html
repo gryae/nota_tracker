@@ -3,130 +3,1113 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard Divisi — Nota Tracker</title>
+  <title>Nota Tracker — Workspace</title>
   <link rel="stylesheet" href="assets/style.css">
-  <!-- Barcode Scanner via Camera Library -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    /* =====================================================
+       SPLIT LAYOUT — LEFT DASHBOARD | RIGHT LAPORAN
+       ===================================================== */
+    body {
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    .workspace-layout {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .workspace-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      gap: 0;
+    }
+
+    /* ── LEFT PANEL ── */
+    .panel-left {
+      width: 380px;
+      min-width: 320px;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      border-right: 2px solid var(--panel-border);
+      background: #0a0f1a;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    .panel-left-header {
+      padding: 1rem 1.25rem 0.75rem;
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(15, 23, 42, 0.95);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .panel-left-header h2 {
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--accent);
+      margin-bottom: 0.15rem;
+    }
+
+    .panel-left-header p {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+    }
+
+    .panel-left-body {
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    /* ── RIGHT PANEL ── */
+    .panel-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #090d16;
+    }
+
+    .panel-right-header {
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(15, 23, 42, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-shrink: 0;
+    }
+
+    .panel-right-header h2 {
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+
+    .panel-right-body {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* =====================================================
+       PROSES CARDS — compact in left panel
+       ===================================================== */
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--panel-border);
+    }
+
+    .proses-grid-compact {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+
+    .proses-card-compact {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 0.65rem 0.75rem;
+      cursor: pointer;
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-height: 52px;
+    }
+    .proses-card-compact::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: transparent;
+      transition: var(--transition);
+    }
+    .proses-card-compact:hover {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.03);
+    }
+    .proses-card-compact.active {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.06);
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.15);
+    }
+    .proses-card-compact.active::before {
+      background: var(--accent);
+    }
+    .proses-card-compact .badge-num {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--panel-border);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+    .proses-card-compact.active .badge-num {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #090d16;
+    }
+    .proses-card-compact .proses-name {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      line-height: 1.2;
+    }
+
+    /* =====================================================
+       SCANNER SECTION — compact
+       ===================================================== */
+    .scanner-compact {
+      background: var(--panel-bg);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 1rem;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.12);
+      position: relative;
+      overflow: hidden;
+      display: none;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .scanner-compact::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--accent);
+    }
+    .scanner-compact .scanner-selected-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 0.35rem;
+    }
+    .scanner-compact .scanner-proses-name {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--accent);
+      font-family: var(--font-mono);
+      letter-spacing: 0.5px;
+      margin-bottom: 0.75rem;
+    }
+    .scanner-input-row {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 0.5rem;
+    }
+    .scanner-input-row .input-control {
+      flex: 1;
+      height: 42px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-align: center;
+      letter-spacing: 0.5px;
+    }
+    .scanner-input-row .btn-submit-scan {
+      height: 42px;
+      padding: 0 1rem;
+      background: var(--accent);
+      color: #090d16;
+      border: none;
+      border-radius: var(--border-radius);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: var(--transition);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .scanner-input-row .btn-submit-scan:hover {
+      background: var(--accent-hover);
+    }
+    .scanner-input-row .btn-submit-scan:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .camera-btn-row {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 0.5rem;
+    }
+    .camera-btn-row .btn {
+      flex: 1;
+      width: auto !important;   /* override global .btn { width: 100% } */
+      min-width: 0;
+      height: 34px;
+      font-size: 0.7rem;
+    }
+    #reader {
+      width: 100%;
+      max-width: 100%;
+      margin: 0.5rem 0;
+      display: none;
+      border: 1px solid var(--panel-border);
+      border-radius: var(--border-radius);
+      overflow: hidden;
+    }
+
+    /* =====================================================
+       TODAY HISTORY — mini list in left panel
+       ===================================================== */
+    .history-mini {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .history-mini-header {
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .history-mini-header span:first-child {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-secondary);
+    }
+    .history-mini-body {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .history-mini-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.85rem;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+      transition: var(--transition);
+    }
+    .history-mini-item:last-child { border-bottom: none; }
+    .history-mini-item:hover { background: rgba(255,255,255,0.015); }
+    .history-mini-nota {
+      font-weight: 700;
+      font-size: 0.8rem;
+      letter-spacing: 0.2px;
+      flex: 1;
+      font-family: var(--font-mono);
+    }
+    .history-mini-proses {
+      font-size: 0.65rem;
+      padding: 0.1rem 0.4rem;
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 2px;
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+    .history-mini-time {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--text-secondary);
+    }
+
+    /* =====================================================
+       RIGHT PANEL — LAPORAN TABLE
+       ===================================================== */
+    .laporan-toolbar {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      background: rgba(10, 15, 26, 0.7);
+      flex-shrink: 0;
+    }
+
+    .laporan-toolbar .filter-input {
+      height: 34px;
+      padding: 0 0.75rem;
+      background: rgba(9, 13, 22, 0.8);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--border-radius);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      outline: none;
+      transition: var(--transition);
+    }
+    .laporan-toolbar .filter-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+    .laporan-toolbar .filter-input-sm { width: 130px; }
+    .laporan-toolbar .filter-input-md { width: 165px; }
+    .laporan-toolbar .filter-select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.5rem center;
+      background-size: 0.85rem;
+      padding-right: 1.75rem;
+    }
+
+    .toolbar-btn {
+      height: 34px;
+      padding: 0 0.85rem;
+      border-radius: var(--border-radius);
+      border: 1px solid var(--panel-border);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: var(--transition);
+      background: rgba(255,255,255,0.02);
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+    .toolbar-btn:hover {
+      background: rgba(255,255,255,0.05);
+      border-color: var(--text-secondary);
+    }
+    .toolbar-btn-primary {
+      background: var(--accent);
+      color: #090d16;
+      border-color: var(--accent);
+    }
+    .toolbar-btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .toolbar-sep {
+      width: 1px;
+      height: 24px;
+      background: var(--panel-border);
+      margin: 0 0.25rem;
+    }
+
+    .sort-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      cursor: pointer;
+      user-select: none;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .sort-btn:hover { color: var(--text-primary); }
+    .sort-btn.active { color: var(--accent); }
+    .sort-arrow { font-size: 0.6rem; }
+
+    /* =====================================================
+       LAPORAN TABLE — SCROLLABLE
+       ===================================================== */
+    .laporan-table-container {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: auto;
+    }
+
+    .laporan-data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.82rem;
+    }
+    .laporan-data-table thead {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    .laporan-data-table th {
+      background: rgba(10, 15, 26, 0.98);
+      padding: 0.65rem 0.85rem;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      border-bottom: 1px solid var(--panel-border);
+      white-space: nowrap;
+    }
+    .laporan-data-table td {
+      padding: 0.6rem 0.85rem;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.35);
+      vertical-align: middle;
+    }
+    .laporan-data-table tbody tr {
+      transition: background 0.15s ease;
+      cursor: pointer;
+    }
+    .laporan-data-table tbody tr:hover {
+      background: rgba(56, 189, 248, 0.04) !important;
+    }
+
+    /* Row color coding by last proses */
+    .row-status-aktif    { background-color: rgba(16, 185, 129, 0.04); border-left: 3px solid rgba(16, 185, 129, 0.5); }
+    .row-status-perhatian { background-color: rgba(245, 158, 11, 0.04); border-left: 3px solid rgba(245, 158, 11, 0.5); }
+    .row-status-tertahan  { background-color: rgba(239, 68, 68, 0.05); border-left: 3px solid rgba(239, 68, 68, 0.5); }
+    .row-status-neutral   { background-color: transparent; border-left: 3px solid rgba(100, 116, 139, 0.3); }
+
+    .nota-link {
+      font-weight: 700;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      letter-spacing: 0.3px;
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(56, 189, 248, 0.4);
+      transition: var(--transition);
+    }
+    .nota-link:hover {
+      color: #7dd3fc;
+      border-bottom-color: #7dd3fc;
+    }
+
+    .proses-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.2rem;
+      padding: 0.15rem 0.45rem;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      border: 1px solid;
+    }
+
+    .time-elapsed {
+      font-size: 0.68rem;
+      margin-top: 0.1rem;
+    }
+
+    .btn-status-change {
+      height: 28px;
+      padding: 0 0.6rem;
+      border-radius: 3px;
+      border: 1px solid var(--panel-border);
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: var(--transition);
+      background: rgba(56, 189, 248, 0.08);
+      color: var(--accent);
+      border-color: rgba(56, 189, 248, 0.3);
+      white-space: nowrap;
+    }
+    .btn-status-change:hover {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: var(--accent);
+    }
+
+    /* =====================================================
+       DETAIL MODAL — Journey & History
+       ===================================================== */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .modal-box {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      width: 100%;
+      max-width: 680px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.7);
+      animation: scaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .modal-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .modal-header h3 {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .modal-nota-id {
+      color: var(--accent);
+      font-size: 1.1rem;
+      font-weight: 800;
+    }
+    .modal-close {
+      background: transparent;
+      border: 1px solid var(--panel-border);
+      color: var(--text-secondary);
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition);
+    }
+    .modal-close:hover {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.25rem;
+    }
+
+    /* Journey Timeline */
+    .journey-timeline {
+      position: relative;
+      padding-left: 2rem;
+    }
+    .journey-timeline::before {
+      content: '';
+      position: absolute;
+      left: 0.55rem;
+      top: 0.75rem;
+      bottom: 0.75rem;
+      width: 2px;
+      background: linear-gradient(to bottom, var(--accent), rgba(56, 189, 248, 0.1));
+    }
+    .journey-step {
+      position: relative;
+      padding: 0.65rem 0.85rem;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+      transition: var(--transition);
+    }
+    .journey-step:hover { background: rgba(255,255,255,0.04); }
+    .journey-step::before {
+      content: '';
+      position: absolute;
+      left: -1.67rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #090d16;
+      box-shadow: 0 0 6px var(--accent-glow);
+    }
+    .journey-step:last-child::before {
+      background: var(--status-active);
+      box-shadow: 0 0 8px var(--status-active-glow);
+      width: 12px;
+      height: 12px;
+      left: -1.73rem;
+    }
+    .journey-step-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.2rem;
+    }
+    .journey-step-divisi {
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+    .journey-step-datetime {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+    .journey-step-proses {
+      font-size: 0.72rem;
+    }
+
+    /* Modal scan action section */
+    .modal-scan-section {
+      margin-top: 1.25rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--panel-border);
+    }
+    .modal-scan-section h4 {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-secondary);
+      margin-bottom: 0.75rem;
+    }
+    .quick-scan-grid {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .quick-scan-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 5px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      background: rgba(56, 189, 248, 0.06);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .quick-scan-btn:hover {
+      background: rgba(56, 189, 248, 0.14);
+      border-color: var(--accent);
+    }
+
+    /* =====================================================
+       NOTA SEARCH — left panel
+       ===================================================== */
+    .nota-search-box {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .nota-search-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+    .nota-search-row .input-control {
+      height: 38px;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      font-size: 0.82rem;
+    }
+    .nota-search-row .input-control:focus {
+      box-shadow: none;
+      background: rgba(56,189,248,0.03);
+    }
+    .nota-search-row .btn-search {
+      height: 38px;
+      padding: 0 0.85rem;
+      border: none;
+      border-left: 1px solid var(--panel-border);
+      background: rgba(255,255,255,0.03);
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: var(--transition);
+      white-space: nowrap;
+    }
+    .nota-search-row .btn-search:hover {
+      background: rgba(56,189,248,0.08);
+      color: var(--accent);
+    }
+
+    /* =====================================================
+       COUNTER CHIPS — toolbar
+       ===================================================== */
+    .stat-chips {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-left: auto;
+    }
+    .stat-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 700;
+      border: 1px solid;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .stat-chip:hover { opacity: 0.85; }
+    .stat-chip.active { opacity: 1; }
+    .stat-chip:not(.active) { opacity: 0.5; }
+    .stat-chip-all    { color: var(--text-primary); border-color: var(--panel-border); background: rgba(255,255,255,0.04); }
+    .stat-chip-aktif  { color: var(--status-active); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.06); }
+    .stat-chip-perhatian { color: #f59e0b; border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.06); }
+    .stat-chip-tertahan  { color: var(--status-stuck); border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.06); }
+    .stat-chip .chip-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .stat-chip-all .chip-dot { background: var(--text-secondary); }
+    .stat-chip-aktif .chip-dot { background: var(--status-active); box-shadow: 0 0 4px var(--status-active); }
+    .stat-chip-perhatian .chip-dot { background: #f59e0b; box-shadow: 0 0 4px #f59e0b; }
+    .stat-chip-tertahan .chip-dot { background: var(--status-stuck); box-shadow: 0 0 4px var(--status-stuck); }
+
+    /* =====================================================
+       LOADING STATES
+       ===================================================== */
+    .loading-row td {
+      text-align: center;
+      color: var(--text-secondary);
+      padding: 3rem 1rem !important;
+      font-size: 0.85rem;
+    }
+    .spinner-inline {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--panel-border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.4rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* =====================================================
+       RESPONSIVE
+       ===================================================== */
+    @media (max-width: 900px) {
+      body { overflow: auto; }
+      .workspace-body { flex-direction: column; overflow: auto; }
+      .panel-left { width: 100%; max-width: 100%; border-right: none; border-bottom: 2px solid var(--panel-border); overflow: visible; }
+      .panel-right { height: 600px; }
+    }
+  </style>
 </head>
 <body>
+  <div class="workspace-layout">
 
-  <!-- Navbar -->
-  <nav class="navbar">
-    <div class="nav-brand">
-      <span>Nota Tracker</span> Dashboard
-    </div>
-    <div class="nav-user">
-      <!-- Populated by app.js -->
-    </div>
-  </nav>
+    <!-- ── NAVBAR ── -->
+    <nav class="navbar">
+      <div class="nav-brand">
+        <span>Nota</span>Tracker
+      </div>
+      <div class="nav-user">
+        <!-- Populated by app.js -->
+      </div>
+    </nav>
 
-  <div class="container">
-    <div class="dashboard-divisi-header">
-      <h1 id="divisiTitleHeader">Dashboard Staff</h1>
-      <p style="color: var(--text-secondary); font-size: 0.95rem;">Pilih alur proses di bawah ini untuk memulai pemindaian nota.</p>
-    </div>
+    <!-- ── MAIN BODY ── -->
+    <div class="workspace-body">
 
-    <!-- Processes Cards Grid -->
-    <div class="proses-grid" id="prosesCardsGrid">
-      <!-- Populated via Javascript -->
-      <div style="text-align: center; grid-column: 1/-1; padding: 2rem; color: var(--text-secondary);">Memuat daftar proses...</div>
-    </div>
+      <!-- ════════════════════════════════════════
+           LEFT PANEL — OPERATIONAL
+           ════════════════════════════════════════ -->
+      <div class="panel-left">
+        <div class="panel-left-header">
+          <h2 id="divisiTitleHeader">🏭 Panel Operasional</h2>
+          <p>Pilih proses → scan nota</p>
+        </div>
+        <div class="panel-left-body">
 
-    <!-- Scanner Input Box -->
-    <div class="scanner-section" id="scannerSection">
-      <div class="glass-card scanner-box">
-        <h3 style="margin-bottom: 0.5rem; font-size: 1.1rem;">
-          Pindai Nota: <span id="selectedProsesLabel" class="scanner-title-highlight">-</span>
-        </h3>
-        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.25rem;">Arahkan barcode scanner atau ketik no nota di bawah ini.</p>
-
-        <form id="scanForm">
-          <div class="form-group" style="margin-bottom: 1rem;">
-            <input type="text" id="notaInput" class="input-control" required placeholder="Masukkan No Nota / Scan Barcode" style="text-align: center; font-size: 1.25rem; font-weight: 600; letter-spacing: 0.5px;" list="notaDatalist" autofocus>
-            <datalist id="notaDatalist"></datalist>
-          </div>
-          
-          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-            <button type="button" class="btn btn-secondary" id="startScanBtn" style="flex: 1;" onclick="startCameraScanner()">📷 Scan Kamera HP</button>
-            <button type="button" class="btn btn-danger" id="stopScanBtn" style="flex: 1; display: none;" onclick="stopCameraScanner()">🛑 Hentikan Scan</button>
+          <!-- 1. CARI NOTA -->
+          <div>
+            <div class="section-label">🔍 Cari Nota</div>
+            <div class="nota-search-box">
+              <div class="nota-search-row">
+                <input type="text" id="notaSearchInput" class="input-control" placeholder="Ketik no. nota..." list="notaDatalist">
+                <datalist id="notaDatalist"></datalist>
+                <button class="btn-search" onclick="searchAndHighlightNota()">Cari →</button>
+              </div>
+            </div>
           </div>
 
-          <!-- Camera scanning region -->
-          <div id="reader" style="width: 100%; max-width: 380px; margin: 1rem auto; display: none; border: 2px solid var(--panel-border); border-radius: var(--border-radius); overflow: hidden;"></div>
+          <!-- 2. PILIH PROSES -->
+          <div>
+            <div class="section-label">⚙️ Pilih Proses</div>
+            <div class="proses-grid-compact" id="prosesCardsGrid">
+              <div style="grid-column:1/-1; text-align:center; padding:1.5rem; color:var(--text-secondary); font-size:0.8rem;">
+                <span class="spinner-inline"></span> Memuat proses...
+              </div>
+            </div>
+          </div>
 
-          <button type="submit" class="btn btn-primary" id="scanSubmitBtn">Kirim Scan / Submit</button>
-        </form>
+          <!-- 3. SCAN / INPUT NOTA -->
+          <div id="scannerSection" class="scanner-compact">
+            <div class="scanner-selected-label">Proses terpilih</div>
+            <div class="scanner-proses-name" id="selectedProsesLabel">-</div>
+            <div class="scanner-input-row">
+              <input type="text" id="notaInput" class="input-control" placeholder="No Nota / Scan Barcode" autocomplete="off">
+              <button class="btn-submit-scan" id="scanSubmitBtn" onclick="handleScanSubmit()">↵ Kirim</button>
+            </div>
+            <div class="camera-btn-row">
+              <button class="btn btn-secondary" id="startScanBtn" style="height:32px; font-size:0.7rem;" onclick="startCameraScanner()">📷 Kamera</button>
+              <button class="btn btn-danger" id="stopScanBtn" style="height:32px; font-size:0.7rem; display:none;" onclick="stopCameraScanner()">🛑 Stop</button>
+            </div>
+            <div id="reader"></div>
+          </div>
+
+          <!-- 4. RIWAYAT HARI INI -->
+          <div>
+            <div class="section-label">📋 Scan Hari Ini</div>
+            <div class="history-mini">
+              <div class="history-mini-header">
+                <span>Riwayat Terbaru</span>
+                <span class="user-tag" id="todayScanCount" style="font-size:0.6rem; padding:0.15rem 0.45rem;">0 Scan</span>
+              </div>
+              <div class="history-mini-body" id="scanHistoryBody">
+                <div style="text-align:center; padding:1.5rem; color:var(--text-secondary); font-size:0.78rem;">
+                  Belum ada scan hari ini.
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /panel-left-body -->
+      </div><!-- /panel-left -->
+
+      <!-- ════════════════════════════════════════
+           RIGHT PANEL — LAPORAN
+           ════════════════════════════════════════ -->
+      <div class="panel-right">
+
+        <!-- TOOLBAR -->
+        <div class="panel-right-header">
+          <h2>📊 Laporan Nota</h2>
+          <div style="display:flex; align-items:center; gap:0.5rem; font-family:var(--font-mono); font-size:0.7rem; color:var(--text-secondary);">
+            <span id="totalNotaCount">— nota</span>
+            <button class="toolbar-btn" id="exportCsvBtn" style="height:30px; font-size:0.65rem;">📥 CSV</button>
+          </div>
+        </div>
+
+        <!-- FILTER TOOLBAR -->
+        <div class="laporan-toolbar">
+          <!-- Search -->
+          <input type="text" id="filterNota" class="filter-input filter-input-md" placeholder="🔍 Cari no. nota...">
+
+          <!-- Date range -->
+          <input type="date" id="filterDari" class="filter-input filter-input-sm" title="Dari Tanggal">
+          <span style="color:var(--text-secondary); font-size:0.75rem;">–</span>
+          <input type="date" id="filterSampai" class="filter-input filter-input-sm" title="Sampai Tanggal">
+
+          <!-- Process filter -->
+          <select id="filterStatus" class="filter-input filter-select" style="width:145px;">
+            <option value="">Semua Status</option>
+            <option value="Aktif">🟢 Aktif</option>
+            <option value="Perlu Perhatian">🟡 Perlu Perhatian</option>
+            <option value="Tertahan">🔴 Tertahan</option>
+          </select>
+
+          <button class="toolbar-btn toolbar-btn-primary" onclick="loadLaporanData()">Cari</button>
+          <button class="toolbar-btn" onclick="resetLaporanFilter()">Reset</button>
+
+          <div class="toolbar-sep"></div>
+
+          <!-- Status Chips as quick filter -->
+          <div class="stat-chips">
+            <div class="stat-chip stat-chip-all active" id="chip-all" onclick="setStatusFilter('')">
+              <span class="chip-dot"></span>
+              <span>Semua</span>
+              <strong id="cntAll">0</strong>
+            </div>
+            <div class="stat-chip stat-chip-aktif" id="chip-aktif" onclick="setStatusFilter('Aktif')">
+              <span class="chip-dot"></span>
+              <strong id="cntAktif">0</strong>
+            </div>
+            <div class="stat-chip stat-chip-perhatian" id="chip-perhatian" onclick="setStatusFilter('Perlu Perhatian')">
+              <span class="chip-dot"></span>
+              <strong id="cntPerhatian">0</strong>
+            </div>
+            <div class="stat-chip stat-chip-tertahan" id="chip-tertahan" onclick="setStatusFilter('Tertahan')">
+              <span class="chip-dot"></span>
+              <strong id="cntTertahan">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- TABLE -->
+        <div class="laporan-table-container">
+          <table class="laporan-data-table" id="laporanTable">
+            <thead>
+              <tr>
+                <th style="width:36px;"></th>
+                <th>
+                  <span class="sort-btn active" id="sort-no_nota" onclick="toggleSort('no_nota')">
+                    No Nota <span class="sort-arrow" id="arrow-no_nota">↕</span>
+                  </span>
+                </th>
+                <th>Divisi</th>
+                <th>
+                  <span class="sort-btn" id="sort-proses" onclick="toggleSort('proses')">
+                    Proses Terakhir <span class="sort-arrow" id="arrow-proses">↕</span>
+                  </span>
+                </th>
+                <th>
+                  <span class="sort-btn" id="sort-tanggal" onclick="toggleSort('tanggal')">
+                    Waktu Update <span class="sort-arrow" id="arrow-tanggal">↕</span>
+                  </span>
+                </th>
+                <th>Status</th>
+                <th style="width:110px;">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="laporanTableBody">
+              <tr class="loading-row">
+                <td colspan="7"><span class="spinner-inline"></span> Memuat data...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div><!-- /panel-right -->
+    </div><!-- /workspace-body -->
+  </div><!-- /workspace-layout -->
+
+  <!-- ════════════════════════════════════════
+       DETAIL MODAL — Journey & History
+       ════════════════════════════════════════ -->
+  <div class="modal-overlay" id="detailModal" style="display:none;" onclick="closeModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <div style="font-family:var(--font-mono); font-size:0.65rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px; margin-bottom:0.2rem;">
+            Detail Perjalanan Nota
+          </div>
+          <div class="modal-nota-id" id="modalNotaId">-</div>
+        </div>
+        <button class="modal-close" onclick="document.getElementById('detailModal').style.display='none'">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="journeyContent">
+          <div style="text-align:center; color:var(--text-secondary); padding:2rem;">
+            <span class="spinner-inline"></span> Memuat perjalanan...
+          </div>
+        </div>
+
+        <!-- Quick Scan Action (only shown if user has processes) -->
+        <div class="modal-scan-section" id="modalScanSection" style="display:none;">
+          <h4>⚡ Scan Cepat Nota Ini</h4>
+          <div class="quick-scan-grid" id="quickScanGrid"></div>
+        </div>
       </div>
     </div>
-
-    <!-- Today's Scan History -->
-    <div class="glass-card" style="margin-top: 1.5rem;">
-      <div class="glass-card-header">
-        <h2>Riwayat Pemindaian Hari Ini</h2>
-        <span class="user-tag" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: var(--status-active);" id="todayScanCount">0 Scan</span>
-      </div>
-
-      <div class="table-responsive">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>No Nota</th>
-              <th>Proses</th>
-              <th style="width: 120px; text-align: right;">Jam</th>
-            </tr>
-          </thead>
-          <tbody id="scanHistoryBody">
-            <tr>
-              <td colspan="3" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Belum ada nota yang diproses hari ini.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
   </div>
 
   <script src="assets/app.js"></script>
   <script>
-    // Verify division session
-    if (!Auth.checkSession('divisi')) {
-      // Session helper handles redirects
-    }
+    // ── AUTH CHECK ──
+    if (!Auth.checkSession()) { /* app.js handles redirect */ }
 
     const user = Auth.getUser();
     let selectedProsesId = null;
+    let selectedProsesName = null;
+    let userProcesses = [];       // division's processes
+    let rawSummaryData = [];      // full laporan data
+    let displayData = [];         // filtered + sorted data
+    let sortKey = 'no_nota';
+    let sortDir = 'asc';
+    let activeStatusFilter = '';
+    let html5QrCode = null;
 
+    // ── INIT ──
     document.addEventListener('DOMContentLoaded', () => {
       if (user) {
-        document.getElementById('divisiTitleHeader').textContent = `Divisi ${user.nama_divisi}`;
+        document.getElementById('divisiTitleHeader').textContent =
+          user.role === 'admin' ? '🏭 Admin Panel' : `🏭 Divisi ${user.nama_divisi}`;
+
         loadDivisionProcesses();
         loadTodayScanHistory();
         loadNotaDatalist();
+        loadLaporanData();
       }
 
-      // Bind events
-      document.getElementById('scanForm').addEventListener('submit', handleScanSubmit);
-      
-      // Auto focus logic
-      window.addEventListener('focus', focusInput);
-      document.body.addEventListener('click', focusInput);
+      // Scan on Enter
+      document.getElementById('notaInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); handleScanSubmit(); }
+      });
+
+      // Search nota on Enter
+      document.getElementById('notaSearchInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); searchAndHighlightNota(); }
+      });
+
+      // Live filter laporan
+      document.getElementById('filterNota').addEventListener('input', applyFiltersAndSort);
+      document.getElementById('filterDari').addEventListener('change', applyFiltersAndSort);
+      document.getElementById('filterSampai').addEventListener('change', applyFiltersAndSort);
+      document.getElementById('filterStatus').addEventListener('change', (e) => {
+        activeStatusFilter = e.target.value;
+        updateStatusChips();
+        applyFiltersAndSort();
+      });
+
+      document.getElementById('exportCsvBtn').addEventListener('click', handleExportCsv);
     });
 
-    // Bring cursor focus back to the input box automatically
-    function focusInput() {
-      const input = document.getElementById('notaInput');
-      const section = document.getElementById('scannerSection');
-      const reader = document.getElementById('reader');
-      if (input && section && section.style.display === 'block' && (!reader || reader.style.display !== 'block')) {
-        input.focus();
-      }
-    }
-
+    // ══════════════════════════════════════
+    // LEFT PANEL — PROCESSES
+    // ══════════════════════════════════════
     async function loadDivisionProcesses() {
       try {
-        // We use the admin endpoint that has been secured to allow division users to get their own processes
         const processes = await apiFetch(`/api/admin/divisi/${user.id}/proses`);
-        renderProcesses(processes || []);
+        userProcesses = processes || [];
+        renderProcesses(userProcesses);
       } catch (err) {
         console.error(err);
       }
@@ -135,165 +1118,164 @@
     function renderProcesses(processes) {
       const grid = document.getElementById('prosesCardsGrid');
       if (processes.length === 0) {
-        grid.innerHTML = `
-          <div style="text-align: center; grid-column: 1/-1; padding: 3rem 1rem; color: var(--text-secondary);">
-            <span style="font-size: 2rem;">⚠️</span>
-            <p style="margin-top: 0.5rem;">Belum ada alur proses yang didefinisikan untuk divisi Anda.<br>Hubungi Administrator untuk mengatur alur proses.</p>
-          </div>
-        `;
+        grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:2rem; color:var(--text-secondary); font-size:0.78rem;">
+          ⚠️ Belum ada proses. Hubungi Administrator.</div>`;
         return;
       }
-
       grid.innerHTML = '';
       processes.forEach(p => {
         const card = document.createElement('div');
-        card.className = 'proses-card';
+        card.className = 'proses-card-compact';
         card.id = `proses-card-${p.id}`;
         card.onclick = () => selectProses(p.id, p.nama_proses);
         card.innerHTML = `
-          <span class="badge-urutan">${p.urutan}</span>
-          <span class="proses-card-title">${p.nama_proses}</span>
+          <span class="badge-num">${p.urutan}</span>
+          <span class="proses-name">${p.nama_proses}</span>
         `;
         grid.appendChild(card);
       });
     }
 
     function selectProses(id, name) {
-      // Toggle active states in grid
-      document.querySelectorAll('.proses-card').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.proses-card-compact').forEach(c => c.classList.remove('active'));
       const activeCard = document.getElementById(`proses-card-${id}`);
-      if (activeCard) {
-        activeCard.classList.add('active');
-      }
+      if (activeCard) activeCard.classList.add('active');
 
       selectedProsesId = id;
-      
-      // Show scanner box
+      selectedProsesName = name;
+
       const scannerSection = document.getElementById('scannerSection');
       scannerSection.style.display = 'block';
-      
-      // Update label
       document.getElementById('selectedProsesLabel').textContent = name;
 
-      // Focus
-      setTimeout(focusInput, 50);
+      setTimeout(() => document.getElementById('notaInput').focus(), 50);
     }
 
-    async function handleScanSubmit(e) {
-      if (e && e.preventDefault) e.preventDefault();
-      
+    // ══════════════════════════════════════
+    // LEFT PANEL — SCAN HANDLER
+    // ══════════════════════════════════════
+    async function handleScanSubmit() {
       const input = document.getElementById('notaInput');
       const no_nota = input.value.trim();
       const submitBtn = document.getElementById('scanSubmitBtn');
 
-      if (!no_nota || !selectedProsesId) return;
+      if (!no_nota || !selectedProsesId) {
+        if (!selectedProsesId) Toast.show('Pilih proses terlebih dahulu.', 'error');
+        return;
+      }
 
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Menyimpan...';
+      submitBtn.textContent = '...';
 
       try {
         const res = await apiFetch('/api/divisi/scan', {
           method: 'POST',
-          body: JSON.stringify({
-            no_nota,
-            proses_id: selectedProsesId
-          })
+          body: JSON.stringify({ no_nota, proses_id: selectedProsesId })
         });
 
         if (res && res.message) {
           Toast.show(res.message, 'success');
-          input.value = ''; // clear input on success
+          input.value = '';
           loadTodayScanHistory();
           loadNotaDatalist();
+          loadLaporanData(); // refresh right panel
         }
       } catch (err) {
-        // App.js error handler already fires a Toast error message
-        // Make sure to select text for quick re-scan on failure
         input.select();
       } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Kirim Scan / Submit';
-        // Force focus back immediately for barcode scanner
-        setTimeout(focusInput, 50);
+        submitBtn.textContent = '↵ Kirim';
+        setTimeout(() => document.getElementById('notaInput').focus(), 50);
       }
     }
 
+    // ══════════════════════════════════════
+    // LEFT PANEL — TODAY HISTORY
+    // ══════════════════════════════════════
     async function loadTodayScanHistory() {
       try {
         const list = await apiFetch('/api/divisi/scan/today') || [];
         renderTodayScanHistory(list);
-      } catch (err) {
-        console.error(err);
-      }
+      } catch (err) { console.error(err); }
     }
 
+    function renderTodayScanHistory(scans) {
+      const body = document.getElementById('scanHistoryBody');
+      document.getElementById('todayScanCount').textContent = `${scans.length} Scan`;
+
+      if (scans.length === 0) {
+        body.innerHTML = '<div style="text-align:center; padding:1.5rem; color:var(--text-secondary); font-size:0.78rem;">Belum ada scan hari ini.</div>';
+        return;
+      }
+      body.innerHTML = '';
+      scans.forEach(s => {
+        const item = document.createElement('div');
+        item.className = 'history-mini-item';
+        item.innerHTML = `
+          <span class="history-mini-nota">${s.no_nota}</span>
+          <span class="history-mini-proses">${s.nama_proses}</span>
+          <span class="history-mini-time">${s.scan_time}</span>
+        `;
+        body.appendChild(item);
+      });
+    }
+
+    // ══════════════════════════════════════
+    // LEFT PANEL — DATALIST & SEARCH
+    // ══════════════════════════════════════
     async function loadNotaDatalist() {
       try {
         const list = await apiFetch('/api/divisi/scan/nota-list') || [];
         const datalist = document.getElementById('notaDatalist');
         datalist.innerHTML = '';
         list.forEach(nota => {
-          const option = document.createElement('option');
-          option.value = nota;
-          datalist.appendChild(option);
+          const opt = document.createElement('option');
+          opt.value = nota;
+          datalist.appendChild(opt);
         });
-      } catch (err) {
-        console.error('Failed to load datalist:', err);
-      }
+      } catch (err) { console.error(err); }
     }
 
-    let html5QrCode = null;
+    function searchAndHighlightNota() {
+      const val = document.getElementById('notaSearchInput').value.trim();
+      if (!val) return;
+      // Set filter and reload
+      document.getElementById('filterNota').value = val;
+      applyFiltersAndSort();
+      // Scroll right panel into view on mobile
+      document.querySelector('.panel-right').scrollIntoView({ behavior: 'smooth' });
+    }
 
+    // ══════════════════════════════════════
+    // CAMERA SCANNER
+    // ══════════════════════════════════════
     async function startCameraScanner() {
       const readerDiv = document.getElementById('reader');
       readerDiv.style.display = 'block';
-
       html5QrCode = new Html5Qrcode("reader");
-
-      const config = { 
-        fps: 15, 
-        qrbox: (width, height) => {
-          const minSize = Math.min(width, height);
-          return {
-            width: Math.floor(width * 0.85),
-            height: Math.floor(minSize * 0.45)
-          };
-        }
-      };
-
+      const config = { fps: 15, qrbox: (w, h) => ({ width: Math.floor(w * 0.85), height: Math.floor(Math.min(w,h) * 0.45) }) };
       try {
         await html5QrCode.start(
           { facingMode: "environment" },
           config,
-          (decodedText, decodedResult) => {
-            const input = document.getElementById('notaInput');
-            input.value = decodedText;
+          (decodedText) => {
+            document.getElementById('notaInput').value = decodedText;
             stopCameraScanner();
-            
-            // Auto submit form
             handleScanSubmit();
           },
-          (errorMessage) => {
-            // Quietly continue searching for barcode in feed
-          }
+          () => {}
         );
-
         document.getElementById('startScanBtn').style.display = 'none';
         document.getElementById('stopScanBtn').style.display = 'block';
       } catch (err) {
-        console.error("Camera access failed:", err);
-        Toast.show("Gagal mengakses kamera. Pastikan izin kamera telah diberikan.", "error");
+        Toast.show("Gagal mengakses kamera.", "error");
         readerDiv.style.display = 'none';
       }
     }
 
     async function stopCameraScanner() {
       if (html5QrCode) {
-        try {
-          await html5QrCode.stop();
-        } catch (err) {
-          console.warn("Scanner stop warning:", err);
-        }
+        try { await html5QrCode.stop(); } catch (e) {}
         html5QrCode = null;
       }
       document.getElementById('reader').style.display = 'none';
@@ -301,31 +1283,309 @@
       document.getElementById('stopScanBtn').style.display = 'none';
     }
 
-    function renderTodayScanHistory(scans) {
-      const body = document.getElementById('scanHistoryBody');
-      const countLabel = document.getElementById('todayScanCount');
-      
-      countLabel.textContent = `${scans.length} Scan`;
+    // ══════════════════════════════════════
+    // RIGHT PANEL — LAPORAN DATA
+    // ══════════════════════════════════════
+    async function loadLaporanData() {
+      const tbody = document.getElementById('laporanTableBody');
+      tbody.innerHTML = '<tr class="loading-row"><td colspan="7"><span class="spinner-inline"></span> Memuat data...</td></tr>';
 
-      if (scans.length === 0) {
-        body.innerHTML = `
-          <tr>
-            <td colspan="3" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Belum ada nota yang diproses hari ini.</td>
-          </tr>
-        `;
+      try {
+        rawSummaryData = await apiFetch('/api/laporan/summary') || [];
+        updateCounters();
+        applyFiltersAndSort();
+      } catch (err) {
+        tbody.innerHTML = '<tr class="loading-row"><td colspan="7" style="color:#ef4444;">Gagal memuat data laporan.</td></tr>';
+      }
+    }
+
+    function updateCounters() {
+      let cntAll = rawSummaryData.length;
+      let cntAktif = 0, cntPerhatian = 0, cntTertahan = 0;
+      rawSummaryData.forEach(r => {
+        if (r.status === 'Aktif') cntAktif++;
+        else if (r.status === 'Perlu Perhatian') cntPerhatian++;
+        else if (r.status === 'Tertahan') cntTertahan++;
+      });
+      document.getElementById('cntAll').textContent = cntAll;
+      document.getElementById('cntAktif').textContent = cntAktif;
+      document.getElementById('cntPerhatian').textContent = cntPerhatian;
+      document.getElementById('cntTertahan').textContent = cntTertahan;
+      document.getElementById('totalNotaCount').textContent = `${cntAll} nota`;
+    }
+
+    // ── FILTER + SORT ──
+    function applyFiltersAndSort() {
+      const filterNota = document.getElementById('filterNota').value.toLowerCase().trim();
+      const filterDari = document.getElementById('filterDari').value;
+      const filterSampai = document.getElementById('filterSampai').value;
+      const filterStatus = activeStatusFilter;
+
+      let filtered = rawSummaryData.filter(r => {
+        if (filterNota && !r.no_nota.toLowerCase().includes(filterNota)) return false;
+        if (filterStatus && r.status !== filterStatus) return false;
+        if (filterDari || filterSampai) {
+          // r.scanned_at is ISO string
+          const scanDate = new Date(r.scanned_at).toISOString().slice(0, 10);
+          if (filterDari && scanDate < filterDari) return false;
+          if (filterSampai && scanDate > filterSampai) return false;
+        }
+        return true;
+      });
+
+      // Sort
+      filtered.sort((a, b) => {
+        let va, vb;
+        if (sortKey === 'no_nota') { va = a.no_nota; vb = b.no_nota; }
+        else if (sortKey === 'proses') { va = a.nama_proses; vb = b.nama_proses; }
+        else if (sortKey === 'tanggal') { va = a.scanned_at; vb = b.scanned_at; }
+        else { va = ''; vb = ''; }
+
+        if (va < vb) return sortDir === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      displayData = filtered;
+      renderLaporanTable(filtered);
+    }
+
+    function toggleSort(key) {
+      if (sortKey === key) {
+        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortKey = key;
+        sortDir = 'asc';
+      }
+      // Update arrow indicators
+      ['no_nota', 'proses', 'tanggal'].forEach(k => {
+        const btn = document.getElementById(`sort-${k}`);
+        const arrow = document.getElementById(`arrow-${k}`);
+        if (btn) {
+          btn.classList.toggle('active', k === sortKey);
+          if (arrow) arrow.textContent = k === sortKey ? (sortDir === 'asc' ? '↑' : '↓') : '↕';
+        }
+      });
+      applyFiltersAndSort();
+    }
+
+    function setStatusFilter(status) {
+      activeStatusFilter = status;
+      document.getElementById('filterStatus').value = status;
+      updateStatusChips();
+      applyFiltersAndSort();
+    }
+
+    function updateStatusChips() {
+      ['all', 'aktif', 'perhatian', 'tertahan'].forEach(k => {
+        const el = document.getElementById(`chip-${k}`);
+        if (!el) return;
+        const val = k === 'all' ? '' : k === 'aktif' ? 'Aktif' : k === 'perhatian' ? 'Perlu Perhatian' : 'Tertahan';
+        el.classList.toggle('active', activeStatusFilter === val);
+      });
+    }
+
+    function resetLaporanFilter() {
+      document.getElementById('filterNota').value = '';
+      document.getElementById('filterDari').value = '';
+      document.getElementById('filterSampai').value = '';
+      activeStatusFilter = '';
+      document.getElementById('filterStatus').value = '';
+      updateStatusChips();
+      applyFiltersAndSort();
+    }
+
+    // ── RENDER TABLE ──
+    function getProsesChipStyle(status) {
+      if (status === 'Aktif') return 'color:#10b981; border-color:rgba(16,185,129,0.3); background:rgba(16,185,129,0.08);';
+      if (status === 'Perlu Perhatian') return 'color:#f59e0b; border-color:rgba(245,158,11,0.3); background:rgba(245,158,11,0.08);';
+      if (status === 'Tertahan') return 'color:#ef4444; border-color:rgba(239,68,68,0.3); background:rgba(239,68,68,0.08);';
+      return 'color:var(--text-secondary); border-color:var(--panel-border); background:rgba(255,255,255,0.02);';
+    }
+
+    function getRowClass(status) {
+      if (status === 'Aktif') return 'row-status-aktif';
+      if (status === 'Perlu Perhatian') return 'row-status-perhatian';
+      if (status === 'Tertahan') return 'row-status-tertahan';
+      return 'row-status-neutral';
+    }
+
+    function formatElapsed(hours) {
+      if (hours < 1) return '<span style="color:#10b981;">Baru saja</span>';
+      if (hours < 4) return `<span style="color:#10b981;">${Math.round(hours)} jam lalu</span>`;
+      if (hours < 24) return `<span style="color:#f59e0b;">${Math.round(hours)} jam lalu</span>`;
+      const days = Math.floor(hours / 24);
+      const h = Math.round(hours % 24);
+      return `<span style="color:#ef4444;">${days}h ${h}j lalu</span>`;
+    }
+
+    function renderLaporanTable(rows) {
+      const tbody = document.getElementById('laporanTableBody');
+
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr class="loading-row"><td colspan="7">Tidak ada nota yang cocok dengan filter.</td></tr>';
         return;
       }
 
-      body.innerHTML = '';
-      scans.forEach(s => {
+      tbody.innerHTML = '';
+      rows.forEach((r, idx) => {
         const row = document.createElement('tr');
+        row.className = getRowClass(r.status);
+        row.title = `Klik untuk lihat detail perjalanan nota ${r.no_nota}`;
+        row.onclick = () => openDetailModal(r.no_nota);
+
+        const chipStyle = getProsesChipStyle(r.status);
+        const statusDot = r.status === 'Aktif' ? '🟢' : r.status === 'Perlu Perhatian' ? '🟡' : '🔴';
+
+        // Check if user has unprocessed step for this nota
+        const canScan = userProcesses.length > 0;
+
         row.innerHTML = `
-          <td style="font-weight: 600; letter-spacing: 0.2px;">${s.no_nota}</td>
-          <td><span class="user-tag" style="display:inline-block; font-size: 0.75rem; padding: 0.15rem 0.5rem;">${s.nama_proses}</span></td>
-          <td style="text-align: right; font-family: monospace; color: var(--text-secondary); font-size: 0.85rem;">${s.scan_time}</td>
+          <td style="text-align:center; color:var(--text-secondary); font-family:var(--font-mono); font-size:0.68rem;">${idx+1}</td>
+          <td>
+            <a href="#" class="nota-link" onclick="event.stopPropagation(); openDetailModal('${r.no_nota}')">${r.no_nota}</a>
+          </td>
+          <td style="font-size:0.78rem; color:var(--text-secondary);">${r.nama_divisi}</td>
+          <td>
+            <span class="proses-chip" style="${chipStyle}">${r.nama_proses}</span>
+          </td>
+          <td>
+            <div style="font-family:var(--font-mono); font-size:0.75rem;">${r.tanggal} <span style="color:var(--text-secondary);">${r.jam}</span></div>
+            <div class="time-elapsed">${formatElapsed(r.hours_elapsed)}</div>
+          </td>
+          <td>
+            <span style="font-size:0.8rem;">${statusDot}</span>
+            <span style="font-size:0.72rem; color:var(--text-secondary); margin-left:0.2rem;">${r.status}</span>
+          </td>
+          <td onclick="event.stopPropagation();">
+            ${canScan ? `<button class="btn-status-change" onclick="openQuickScan('${r.no_nota}')">⚡ Proses</button>` : '—'}
+          </td>
         `;
-        body.appendChild(row);
+        tbody.appendChild(row);
       });
+    }
+
+    // ══════════════════════════════════════
+    // DETAIL MODAL
+    // ══════════════════════════════════════
+    async function openDetailModal(noNota) {
+      const modal = document.getElementById('detailModal');
+      const journeyContent = document.getElementById('journeyContent');
+      const modalScanSection = document.getElementById('modalScanSection');
+      const quickScanGrid = document.getElementById('quickScanGrid');
+
+      document.getElementById('modalNotaId').textContent = noNota;
+      journeyContent.innerHTML = '<div style="text-align:center; color:var(--text-secondary); padding:2rem;"><span class="spinner-inline"></span> Memuat perjalanan...</div>';
+      modalScanSection.style.display = 'none';
+      modal.style.display = 'flex';
+
+      try {
+        const journey = await apiFetch(`/api/laporan/nota/${encodeURIComponent(noNota)}`);
+
+        if (!journey || journey.length === 0) {
+          journeyContent.innerHTML = '<div style="text-align:center; color:var(--text-secondary); padding:2rem;">Tidak ada data perjalanan.</div>';
+          return;
+        }
+
+        // Build timeline
+        let html = '<div class="journey-timeline">';
+        journey.forEach((step, idx) => {
+          const isLast = idx === journey.length - 1;
+          html += `
+            <div class="journey-step">
+              <div class="journey-step-header">
+                <span class="journey-step-divisi">${step.nama_divisi}</span>
+                <span class="journey-step-datetime">${step.tanggal} · ${step.jam}</span>
+              </div>
+              <div class="journey-step-proses">
+                <span class="proses-chip" style="${isLast ? 'color:#10b981; border-color:rgba(16,185,129,0.3); background:rgba(16,185,129,0.08);' : 'color:var(--text-secondary); border-color:var(--panel-border); background:rgba(255,255,255,0.02);'}">${step.nama_proses}</span>
+                ${isLast ? '<span style="font-size:0.7rem; color:var(--text-secondary); margin-left:0.5rem;">← Status Terakhir</span>' : ''}
+              </div>
+            </div>
+          `;
+        });
+        html += '</div>';
+        journeyContent.innerHTML = html;
+
+        // Show quick scan buttons if user has processes
+        if (userProcesses.length > 0) {
+          quickScanGrid.innerHTML = '';
+          userProcesses.forEach(p => {
+            const btn = document.createElement('button');
+            btn.className = 'quick-scan-btn';
+            btn.textContent = `${p.urutan}. ${p.nama_proses}`;
+            btn.onclick = () => quickScanFromModal(noNota, p.id, p.nama_proses);
+            quickScanGrid.appendChild(btn);
+          });
+          modalScanSection.style.display = 'block';
+        }
+      } catch (err) {
+        journeyContent.innerHTML = '<div style="text-align:center; color:#ef4444; padding:2rem;">Gagal memuat detail.</div>';
+      }
+    }
+
+    async function quickScanFromModal(noNota, prosesId, prosesName) {
+      try {
+        const res = await apiFetch('/api/divisi/scan', {
+          method: 'POST',
+          body: JSON.stringify({ no_nota: noNota, proses_id: prosesId })
+        });
+        if (res && res.message) {
+          Toast.show(res.message, 'success');
+          // Refresh modal detail
+          openDetailModal(noNota);
+          loadTodayScanHistory();
+          loadLaporanData();
+        }
+      } catch (err) {
+        // Toast already shown by apiFetch
+      }
+    }
+
+    function openQuickScan(noNota) {
+      openDetailModal(noNota);
+    }
+
+    function closeModal(event) {
+      if (event.target === document.getElementById('detailModal')) {
+        document.getElementById('detailModal').style.display = 'none';
+      }
+    }
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.getElementById('detailModal').style.display = 'none';
+      }
+    });
+
+    // ══════════════════════════════════════
+    // EXPORT CSV
+    // ══════════════════════════════════════
+    async function handleExportCsv() {
+      const no_nota = document.getElementById('filterNota').value.trim();
+      const dari = document.getElementById('filterDari').value;
+      const sampai = document.getElementById('filterSampai').value;
+      const q = new URLSearchParams();
+      if (no_nota) q.set('no_nota', no_nota);
+      if (dari) q.set('dari', dari);
+      if (sampai) q.set('sampai', sampai);
+      try {
+        const csvText = await apiFetch(`/api/laporan/export-csv?${q.toString()}`);
+        if (!csvText) return;
+        const blob = new Blob(['\uFEFF' + csvText], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'laporan_nota.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        Toast.show('File CSV berhasil diekspor.', 'success');
+      } catch (err) {
+        console.error(err);
+      }
     }
   </script>
 </body>

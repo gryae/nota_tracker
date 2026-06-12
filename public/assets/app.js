@@ -204,8 +204,7 @@ function setupNavbar() {
       } else {
         navLinksHTML = `
           <div class="nav-links">
-            <a href="dashboard.html" class="nav-link ${window.location.pathname.endsWith('dashboard.html') ? 'active' : ''}">Dashboard</a>
-            <a href="laporan.html" class="nav-link ${window.location.pathname.endsWith('laporan.html') ? 'active' : ''}">Laporan</a>
+            <a href="dashboard.html" class="nav-link active">Workspace</a>
           </div>
         `;
       }
