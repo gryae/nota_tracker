@@ -3,6 +3,9 @@ setlocal enabledelayedexpansion
 title Nota Tracker - Installer
 chcp 65001 >nul
 
+:: Pindah ke folder tempat install.bat ini berada (WAJIB!)
+cd /d "%~dp0"
+
 :: ============================================================
 ::  KONFIGURASI — SESUAIKAN INI SEBELUM JALANKAN!
 :: ============================================================
