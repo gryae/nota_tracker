@@ -12,13 +12,7 @@
     <div class="login-card">
       <div class="login-title">
         <h1>Nota Tracker</h1>
-        <p id="loginSubtitle">Circulation Tracking System</p>
-      </div>
-
-      <!-- Login Mode Tabs -->
-      <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; background: rgba(9, 13, 22, 0.8); padding: 0.25rem; border-radius: var(--border-radius); border: 1px solid var(--panel-border);">
-        <button id="tabDivisi" class="btn btn-secondary btn-inline active" style="flex: 1; height: 34px; border: none; font-size: 0.8rem; border-radius: var(--border-radius);" onclick="setLoginMode('divisi')">Divisi</button>
-        <button id="tabAdmin" class="btn btn-secondary btn-inline" style="flex: 1; height: 34px; border: none; font-size: 0.8rem; border-radius: var(--border-radius);" onclick="setLoginMode('admin')">Admin</button>
+        <p>Circulation Tracking System</p>
       </div>
 
       <form id="loginForm">
@@ -33,7 +27,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary" style="margin-top: 1rem;" id="submitBtn">
-          Login Divisi
+          Login
         </button>
       </form>
     </div>
@@ -41,9 +35,7 @@
 
   <script src="assets/app.js"></script>
   <script>
-    let currentMode = 'divisi'; // 'divisi' or 'admin'
-
-    // Check if user is already logged in
+    // Redirect jika sudah login
     document.addEventListener('DOMContentLoaded', () => {
       const user = Auth.getUser();
       const token = Auth.getToken();
@@ -56,29 +48,9 @@
       }
     });
 
-    function setLoginMode(mode) {
-      currentMode = mode;
-      const tabDivisi = document.getElementById('tabDivisi');
-      const tabAdmin = document.getElementById('tabAdmin');
-      const submitBtn = document.getElementById('submitBtn');
-      const loginSubtitle = document.getElementById('loginSubtitle');
-
-      if (mode === 'admin') {
-        tabAdmin.classList.add('active');
-        tabDivisi.classList.remove('active');
-        submitBtn.textContent = 'Login Administrator';
-        loginSubtitle.textContent = 'Admin Management Console';
-      } else {
-        tabDivisi.classList.add('active');
-        tabAdmin.classList.remove('active');
-        submitBtn.textContent = 'Login Divisi';
-        loginSubtitle.textContent = 'Circulation Tracking System';
-      }
-    }
-
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       const usernameInput = document.getElementById('username');
       const passwordInput = document.getElementById('password');
       const submitBtn = document.getElementById('submitBtn');
@@ -91,10 +63,8 @@
       submitBtn.disabled = true;
       submitBtn.textContent = 'Memproses...';
 
-      const endpoint = currentMode === 'admin' ? '/api/auth/login-admin' : '/api/auth/login-divisi';
-
       try {
-        const response = await apiFetch(endpoint, {
+        const response = await apiFetch('/api/auth/login', {
           method: 'POST',
           body: JSON.stringify({ username, password })
         });
@@ -108,7 +78,7 @@
           });
 
           Toast.show('Login berhasil! Mengalihkan...', 'success');
-          
+
           setTimeout(() => {
             if (response.role === 'admin') {
               window.location.href = 'admin.html';
@@ -118,11 +88,11 @@
           }, 1000);
         } else {
           submitBtn.disabled = false;
-          setLoginMode(currentMode);
+          submitBtn.textContent = 'Login';
         }
       } catch (err) {
         submitBtn.disabled = false;
-        setLoginMode(currentMode);
+        submitBtn.textContent = 'Login';
       }
     });
   </script>
