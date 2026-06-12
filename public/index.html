@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Nota Tracker</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+  <div class="login-wrapper">
+    <div class="login-card">
+      <div class="login-title">
+        <h1>Nota Tracker</h1>
+        <p id="loginSubtitle">Circulation Tracking System</p>
+      </div>
+
+      <!-- Login Mode Tabs -->
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; background: rgba(9, 13, 22, 0.8); padding: 0.25rem; border-radius: var(--border-radius); border: 1px solid var(--panel-border);">
+        <button id="tabDivisi" class="btn btn-secondary btn-inline active" style="flex: 1; height: 34px; border: none; font-size: 0.8rem; border-radius: var(--border-radius);" onclick="setLoginMode('divisi')">Divisi</button>
+        <button id="tabAdmin" class="btn btn-secondary btn-inline" style="flex: 1; height: 34px; border: none; font-size: 0.8rem; border-radius: var(--border-radius);" onclick="setLoginMode('admin')">Admin</button>
+      </div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" class="input-control" placeholder="Masukkan username" required autocomplete="username">
+        </div>
+        
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" class="input-control" placeholder="Masukkan password" required autocomplete="current-password">
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="margin-top: 1rem;" id="submitBtn">
+          Login Divisi
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    let currentMode = 'divisi'; // 'divisi' or 'admin'
+
+    // Check if user is already logged in
+    document.addEventListener('DOMContentLoaded', () => {
+      const user = Auth.getUser();
+      const token = Auth.getToken();
+      if (user && token) {
+        if (user.role === 'admin') {
+          window.location.href = 'admin.html';
+        } else {
+          window.location.href = 'dashboard.html';
+        }
+      }
+    });
+
+    function setLoginMode(mode) {
+      currentMode = mode;
+      const tabDivisi = document.getElementById('tabDivisi');
+      const tabAdmin = document.getElementById('tabAdmin');
+      const submitBtn = document.getElementById('submitBtn');
+      const loginSubtitle = document.getElementById('loginSubtitle');
+
+      if (mode === 'admin') {
+        tabAdmin.classList.add('active');
+        tabDivisi.classList.remove('active');
+        submitBtn.textContent = 'Login Administrator';
+        loginSubtitle.textContent = 'Admin Management Console';
+      } else {
+        tabDivisi.classList.add('active');
+        tabAdmin.classList.remove('active');
+        submitBtn.textContent = 'Login Divisi';
+        loginSubtitle.textContent = 'Circulation Tracking System';
+      }
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const usernameInput = document.getElementById('username');
+      const passwordInput = document.getElementById('password');
+      const submitBtn = document.getElementById('submitBtn');
+
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value;
+
+      if (!username || !password) return;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Memproses...';
+
+      const endpoint = currentMode === 'admin' ? '/api/auth/login-admin' : '/api/auth/login-divisi';
+
+      try {
+        const response = await apiFetch(endpoint, {
+          method: 'POST',
+          body: JSON.stringify({ username, password })
+        });
+
+        if (response && response.token) {
+          Auth.setSession(response.token, {
+            id: response.id,
+            username: response.username,
+            nama_divisi: response.nama_divisi,
+            role: response.role
+          });
+
+          Toast.show('Login berhasil! Mengalihkan...', 'success');
+          
+          setTimeout(() => {
+            if (response.role === 'admin') {
+              window.location.href = 'admin.html';
+            } else {
+              window.location.href = 'dashboard.html';
+            }
+          }, 1000);
+        } else {
+          submitBtn.disabled = false;
+          setLoginMode(currentMode);
+        }
+      } catch (err) {
+        submitBtn.disabled = false;
+        setLoginMode(currentMode);
+      }
+    });
+  </script>
+</body>
+</html>

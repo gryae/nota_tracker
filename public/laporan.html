@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laporan & Summary — Nota Tracker</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    /* Tab Styling */
+    .tab-container {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--glass-border);
+      padding-bottom: 0.5rem;
+    }
+    
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: var(--transition);
+    }
+    
+    .tab-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .tab-btn.active {
+      color: var(--text-primary);
+      background: rgba(59, 130, 246, 0.15);
+      border-bottom: 2px solid var(--accent);
+      border-radius: 6px 6px 0 0;
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Summary Counters */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .summary-stat-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .summary-stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+
+    .summary-stat-card.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .stat-val {
+      font-size: 2rem;
+      font-weight: 800;
+      margin-top: 0.25rem;
+    }
+    
+    .stat-val-all { color: var(--text-primary); }
+    .stat-val-aktif { color: var(--status-active); }
+    .stat-val-perhatian { color: var(--status-attention); }
+    .stat-val-tertahan { color: var(--status-stuck); }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span>Nota Tracker</span> Laporan
+    </div>
+    <div class="nav-user">
+      <!-- Populated by app.js -->
+    </div>
+  </nav>
+
+  <div class="container">
+    
+    <!-- Tab Controls -->
+    <div class="tab-container">
+      <button class="tab-btn active" onclick="switchTab('laporanTab')">📋 Perjalanan Nota</button>
+      <button class="tab-btn" onclick="switchTab('summaryTab')">📊 Ringkasan Status</button>
+    </div>
+
+    <!-- TAB 1: PERJALANAN NOTA (LAPORAN) -->
+    <div id="laporanTab" class="tab-content active">
+      <div class="glass-card">
+        <div class="glass-card-header" style="border-bottom: none; margin-bottom: 0.5rem; padding-bottom: 0;">
+          <h2>Filter Pencarian Laporan</h2>
+        </div>
+
+        <form id="filterForm">
+          <div class="filter-grid">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="noNotaFilter">No Nota</label>
+              <input type="text" id="noNotaFilter" class="input-control" placeholder="Cari No Nota...">
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="divisiFilter">Divisi</label>
+              <select id="divisiFilter" class="input-control select-control">
+                <option value="">Semua Divisi</option>
+                <!-- Dynamically loaded -->
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="dariFilter">Dari Tanggal</label>
+              <input type="date" id="dariFilter" class="input-control">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="sampaiFilter">Sampai Tanggal</label>
+              <input type="date" id="sampaiFilter" class="input-control">
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.25rem;">
+            <button type="button" class="btn btn-secondary btn-inline" style="height: 40px;" onclick="resetFilters()">Reset</button>
+            <button type="button" class="btn btn-secondary btn-inline" style="height: 40px; border-color: #059669; color: #34d399;" id="exportCsvBtn">📥 Export CSV</button>
+            <button type="submit" class="btn btn-primary btn-inline" style="height: 40px;">Cari Data</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Laporan Table -->
+      <div class="glass-card">
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>No Nota</th>
+                <th>Divisi</th>
+                <th>Proses</th>
+                <th>Tanggal</th>
+                <th>Jam</th>
+              </tr>
+            </thead>
+            <tbody id="laporanTableBody">
+              <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Silakan cari atau klik "Cari Data" untuk menampilkan.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: RINGKASAN STATUS (SUMMARY) -->
+    <div id="summaryTab" class="tab-content">
+      
+      <!-- Counters Grid -->
+      <div class="summary-grid">
+        <div class="summary-stat-card active" id="statCardAll" onclick="filterSummary('all')">
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 700;">Total Active Nota</div>
+          <div class="stat-val stat-val-all" id="cntAll">0</div>
+        </div>
+        <div class="summary-stat-card" id="statCardAktif" onclick="filterSummary('aktif')">
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--status-active); font-weight: 700;">🟢 Aktif (&le; 4 Jam)</div>
+          <div class="stat-val stat-val-aktif" id="cntAktif">0</div>
+        </div>
+        <div class="summary-stat-card" id="statCardPerhatian" onclick="filterSummary('perhatian')">
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--status-attention); font-weight: 700;">🟡 Perhatian (4-24 Jam)</div>
+          <div class="stat-val stat-val-perhatian" id="cntPerhatian">0</div>
+        </div>
+        <div class="summary-stat-card" id="statCardTertahan" onclick="filterSummary('tertahan')">
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--status-stuck); font-weight: 700;">🔴 Tertahan (&gt; 24 Jam)</div>
+          <div class="stat-val stat-val-tertahan" id="cntTertahan">0</div>
+        </div>
+      </div>
+
+      <!-- Summary Table -->
+      <div class="glass-card">
+        <div class="glass-card-header">
+          <h2>Daftar Ringkasan Status Nota</h2>
+          <span class="user-tag" style="background: rgba(255,255,255,0.04);" id="filterSummaryLabel">Tampilkan: Semua</span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>No Nota</th>
+                <th>Posisi Terakhir</th>
+                <th>Proses Terakhir</th>
+                <th>Waktu Update</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="summaryTableBody">
+              <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Loading data ringkasan...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    // Verify session
+    if (!Auth.checkSession()) {
+      // App.js handles redirect
+    }
+
+    let rawSummaryData = [];
+    let activeSummaryFilter = 'all';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadDivisionsDropdown();
+      
+      // Auto-trigger search on load to populate table
+      loadLaporanData();
+      
+      // Bind events
+      document.getElementById('filterForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        loadLaporanData();
+      });
+
+      document.getElementById('exportCsvBtn').addEventListener('click', handleExportCsv);
+    });
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+      });
+
+      // Activate clicked button and tab content
+      event.target.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+
+      if (tabId === 'summaryTab') {
+        loadSummaryData();
+      }
+    }
+
+    async function loadDivisionsDropdown() {
+      try {
+        const divisions = await apiFetch('/api/admin/divisi') || [];
+        const select = document.getElementById('divisiFilter');
+        select.innerHTML = '<option value="">Semua Divisi</option>';
+        divisions.forEach(d => {
+          const opt = document.createElement('option');
+          opt.value = d.id;
+          opt.textContent = d.nama_divisi;
+          select.appendChild(opt);
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // --- TAB 1: LAPORAN JOURNEY ACTIONS ---
+
+    async function loadLaporanData() {
+      const body = document.getElementById('laporanTableBody');
+      body.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Memuat data...</td></tr>';
+
+      const no_nota = document.getElementById('noNotaFilter').value.trim();
+      const divisi_id = document.getElementById('divisiFilter').value;
+      const dari = document.getElementById('dariFilter').value;
+      const sampai = document.getElementById('sampaiFilter').value;
+
+      // Build query string
+      const q = new URLSearchParams();
+      if (no_nota) q.set('no_nota', no_nota);
+      if (divisi_id) q.set('divisi_id', divisi_id);
+      if (dari) q.set('dari', dari);
+      if (sampai) q.set('sampai', sampai);
+
+      try {
+        const rows = await apiFetch(`/api/laporan/nota?${q.toString()}`) || [];
+        renderLaporan(rows);
+      } catch (err) {
+        body.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #ef4444; padding: 2rem;">Gagal memuat data laporan.</td></tr>';
+      }
+    }
+
+    function renderLaporan(rows) {
+      const body = document.getElementById('laporanTableBody');
+      
+      if (rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Tidak ada data yang cocok dengan kriteria filter.</td></tr>';
+        return;
+      }
+
+      body.innerHTML = '';
+      let lastNota = null;
+
+      rows.forEach(r => {
+        // Group row by No Nota header
+        if (r.no_nota !== lastNota) {
+          lastNota = r.no_nota;
+          
+          const headerRow = document.createElement('tr');
+          headerRow.className = 'group-header-row';
+          
+          const warningBadge = r.isStuck24h 
+            ? ' <span class="status-badge status-badge-tertahan" style="margin-left:1rem; font-size:0.65rem; padding: 0.15rem 0.4rem;"><span class="dot-indicator"></span>Tertahan &gt; 24 Jam</span>' 
+            : '';
+
+          headerRow.innerHTML = `
+            <td colspan="5" class="group-header-cell">
+              📁 Invoice Nota: <strong style="letter-spacing:0.5px;">${r.no_nota}</strong> ${warningBadge}
+            </td>
+          `;
+          body.appendChild(headerRow);
+        }
+
+        // Add scan detail row
+        const row = document.createElement('tr');
+        if (r.isStuck24h) {
+          row.className = 'row-danger';
+        }
+        
+        row.innerHTML = `
+          <td style="padding-left: 2rem; color: var(--text-secondary); font-size:0.85rem;">Journey step:</td>
+          <td style="font-weight: 500;">${r.nama_divisi}</td>
+          <td><span class="user-tag" style="background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.08); font-size: 0.75rem; padding: 0.15rem 0.5rem; display: inline-block;">${r.nama_proses}</span></td>
+          <td>${r.tanggal}</td>
+          <td style="font-family: monospace; color: var(--text-secondary); font-size: 0.85rem;">${r.jam}</td>
+        `;
+        body.appendChild(row);
+      });
+    }
+
+    function resetFilters() {
+      document.getElementById('noNotaFilter').value = '';
+      document.getElementById('divisiFilter').value = '';
+      document.getElementById('dariFilter').value = '';
+      document.getElementById('sampaiFilter').value = '';
+      loadLaporanData();
+    }
+
+    async function handleExportCsv() {
+      const no_nota = document.getElementById('noNotaFilter').value.trim();
+      const divisi_id = document.getElementById('divisiFilter').value;
+      const dari = document.getElementById('dariFilter').value;
+      const sampai = document.getElementById('sampaiFilter').value;
+
+      const q = new URLSearchParams();
+      if (no_nota) q.set('no_nota', no_nota);
+      if (divisi_id) q.set('divisi_id', divisi_id);
+      if (dari) q.set('dari', dari);
+      if (sampai) q.set('sampai', sampai);
+
+      try {
+        const csvText = await apiFetch(`/api/laporan/export-csv?${q.toString()}`);
+        if (!csvText) return;
+        
+        // Add UTF-8 BOM for Excel compatibility and set correct MIME type
+        const blob = new Blob(['\uFEFF' + csvText], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'laporan_nota.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        Toast.show('File CSV berhasil diekspor.', 'success');
+      } catch (err) {
+        console.error('Gagal mengekspor CSV:', err);
+      }
+    }
+
+    // --- TAB 2: ACTIVE NOTA SUMMARY ACTIONS ---
+
+    async function loadSummaryData() {
+      const body = document.getElementById('summaryTableBody');
+      body.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Memuat ringkasan...</td></tr>';
+      
+      try {
+        rawSummaryData = await apiFetch('/api/laporan/summary') || [];
+        updateSummaryCounters();
+        renderSummaryTable();
+      } catch (err) {
+        body.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #ef4444; padding: 2rem;">Gagal memuat data ringkasan.</td></tr>';
+      }
+    }
+
+    function updateSummaryCounters() {
+      let countAll = rawSummaryData.length;
+      let countAktif = 0;
+      let countPerhatian = 0;
+      let countTertahan = 0;
+
+      rawSummaryData.forEach(r => {
+        if (r.status === 'Aktif') countAktif++;
+        else if (r.status === 'Perlu Perhatian') countPerhatian++;
+        else if (r.status === 'Tertahan') countTertahan++;
+      });
+
+      document.getElementById('cntAll').textContent = countAll;
+      document.getElementById('cntAktif').textContent = countAktif;
+      document.getElementById('cntPerhatian').textContent = countPerhatian;
+      document.getElementById('cntTertahan').textContent = countTertahan;
+    }
+
+    function filterSummary(filter) {
+      activeSummaryFilter = filter;
+      
+      // Update card active styles
+      document.querySelectorAll('.summary-stat-card').forEach(c => c.classList.remove('active'));
+      
+      const label = document.getElementById('filterSummaryLabel');
+      
+      if (filter === 'all') {
+        document.getElementById('statCardAll').classList.add('active');
+        label.textContent = 'Tampilkan: Semua';
+      } else if (filter === 'aktif') {
+        document.getElementById('statCardAktif').classList.add('active');
+        label.textContent = 'Tampilkan: 🟢 Aktif';
+      } else if (filter === 'perhatian') {
+        document.getElementById('statCardPerhatian').classList.add('active');
+        label.textContent = 'Tampilkan: 🟡 Perlu Perhatian';
+      } else if (filter === 'tertahan') {
+        document.getElementById('statCardTertahan').classList.add('active');
+        label.textContent = 'Tampilkan: 🔴 Tertahan';
+      }
+
+      renderSummaryTable();
+    }
+
+    function renderSummaryTable() {
+      const body = document.getElementById('summaryTableBody');
+      
+      // Filter list
+      const filtered = rawSummaryData.filter(r => {
+        if (activeSummaryFilter === 'all') return true;
+        if (activeSummaryFilter === 'aktif' && r.status === 'Aktif') return true;
+        if (activeSummaryFilter === 'perhatian' && r.status === 'Perlu Perhatian') return true;
+        if (activeSummaryFilter === 'tertahan' && r.status === 'Tertahan') return true;
+        return false;
+      });
+
+      if (filtered.length === 0) {
+        body.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Tidak ada nota dengan kriteria status ini.</td></tr>';
+        return;
+      }
+
+      body.innerHTML = '';
+      filtered.forEach(r => {
+        const row = document.createElement('tr');
+        
+        let rowClass = '';
+        let badgeClass = 'status-badge-aktif';
+        
+        if (r.status === 'Tertahan') {
+          rowClass = 'row-danger';
+          badgeClass = 'status-badge-tertahan';
+        } else if (r.status === 'Perlu Perhatian') {
+          rowClass = 'row-warning';
+          badgeClass = 'status-badge-perhatian';
+        }
+
+        row.className = rowClass;
+        
+        // Duration text
+        let durationText = '';
+        if (r.hours_elapsed < 1) {
+          durationText = 'Baru saja';
+        } else if (r.hours_elapsed < 24) {
+          durationText = `${Math.round(r.hours_elapsed)} jam lalu`;
+        } else {
+          const days = Math.floor(r.hours_elapsed / 24);
+          const hours = Math.round(r.hours_elapsed % 24);
+          durationText = `${days} hari ${hours} jam lalu`;
+        }
+
+        row.innerHTML = `
+          <td style="font-weight: 700; letter-spacing: 0.3px;">
+            <a href="#" onclick="viewNotaJourney('${r.no_nota}')" style="color:var(--accent); text-decoration:none; border-bottom: 1px dashed var(--accent);">${r.no_nota}</a>
+          </td>
+          <td>${r.nama_divisi}</td>
+          <td><span class="user-tag" style="background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.08); font-size: 0.75rem; padding: 0.15rem 0.5rem; display: inline-block;">${r.nama_proses}</span></td>
+          <td style="font-size:0.85rem; color:var(--text-secondary);">
+            <span>${r.tanggal} ${r.jam}</span>
+            <br>
+            <span style="font-size:0.75rem; color:${r.status === 'Tertahan' ? '#f43f5e' : (r.status === 'Perlu Perhatian' ? '#38bdf8' : '#60a5fa')}">${durationText}</span>
+          </td>
+          <td>
+            <span class="status-badge ${badgeClass}">
+              <span class="dot-indicator"></span>${r.status}
+            </span>
+          </td>
+        `;
+        body.appendChild(row);
+      });
+    }
+
+    // Interactively focus the journey tab for a specific nota number
+    function viewNotaJourney(noNota) {
+      switchTab('laporanTab');
+      const tabBtn = document.querySelector('.tab-btn[onclick*="laporanTab"]');
+      if (tabBtn) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        tabBtn.classList.add('active');
+      }
+      document.getElementById('noNotaFilter').value = noNota;
+      loadLaporanData();
+    }
+  </script>
+</body>
+</html>

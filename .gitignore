@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# SSL Certificate (JANGAN dicommit - private key ada di sini!)
+cert/
+
+# Local fallback database (data lokal, bukan untuk production)
+database_fallback.json
+
+# Installation report (generated otomatis oleh install.bat)
+install_report.txt
+
+# Environment / secrets (jika nanti dipakai)
+.env
+.env.local
+.env.production
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Logs
+*.log
+npm-debug.log*
+
+# PM2
+.pm2/
+ecosystem.config.js
+
+# Debug / scratch files
+scratch/

@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel — Nota Tracker</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+  <!-- Top Navbar -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span>Nota Tracker</span> Admin
+    </div>
+    <div class="nav-user">
+      <!-- Populated by app.js -->
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- Main Grid -->
+    <div class="admin-grid">
+      
+      <!-- LEFT COLUMN: Divisions list -->
+      <div>
+        <div class="glass-card">
+          <div class="glass-card-header">
+            <h2>Daftar Divisi (<span id="divisiCount">0</span>/10)</h2>
+            <button id="addDivisiBtn" class="btn btn-primary btn-inline" style="height: 38px;">+ Tambah Divisi</button>
+          </div>
+
+          <div id="divisiList">
+            <!-- Populated via Javascript -->
+            <div style="text-align: center; color: var(--text-secondary); padding: 2rem;">Loading divisi...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: Selected Division Details & Processes -->
+      <div>
+        <div class="glass-card" id="prosesCardSection" style="display: none;">
+          <div class="glass-card-header">
+            <div>
+              <h2 id="prosesCardTitle">Proses Divisi</h2>
+              <p id="prosesCardSubtitle" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">Divisi: Gudang</p>
+            </div>
+            <button id="addProsesBtn" class="btn btn-primary btn-inline" style="height: 38px;">+ Proses</button>
+          </div>
+
+          <div id="prosesList">
+            <!-- Populated via Javascript -->
+          </div>
+        </div>
+
+        <div class="glass-card" id="prosesPlaceholderSection" style="text-align: center; color: var(--text-secondary); padding: 3rem 1.5rem; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 200px;">
+          <span style="font-size: 2.5rem; margin-bottom: 1rem;">🏢</span>
+          <p>Pilih divisi dari daftar untuk mengelola alur proses/departemen.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODALS (Rendered dynamically or static hidden boxes) -->
+  
+  <!-- Division Modal -->
+  <div id="divisiModal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center;">
+    <div class="glass-card" style="width: 90%; max-width: 450px; margin-bottom: 0;">
+      <div class="glass-card-header">
+        <h2 id="divisiModalTitle">Tambah Divisi Baru</h2>
+        <button onclick="closeDivisiModal()" style="background:transparent; border:none; color:white; font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+      <form id="divisiForm">
+        <input type="hidden" id="divisiIdInput">
+        <div class="form-group">
+          <label for="namaDivisiInput">Nama Divisi</label>
+          <input type="text" id="namaDivisiInput" class="input-control" required placeholder="Contoh: Gudang, Kasir, Toko">
+        </div>
+        <div class="form-group">
+          <label for="usernameInput">Username</label>
+          <input type="text" id="usernameInput" class="input-control" required placeholder="Username untuk login staff">
+        </div>
+        <div class="form-group">
+          <label for="passwordInput" id="passwordLabel">Password</label>
+          <input type="password" id="passwordInput" class="input-control" placeholder="Kata sandi login staff">
+          <span id="passwordHelp" style="font-size:0.75rem; color:var(--text-secondary); display:none; margin-top:0.25rem;">Kosongkan jika tidak ingin mengubah password.</span>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeDivisiModal()">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Process Modal -->
+  <div id="prosesModal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center;">
+    <div class="glass-card" style="width: 90%; max-width: 450px; margin-bottom: 0;">
+      <div class="glass-card-header">
+        <h2 id="prosesModalTitle">Tambah Proses Baru</h2>
+        <button onclick="closeProsesModal()" style="background:transparent; border:none; color:white; font-size:1.5rem; cursor:pointer;">&times;</button>
+      </div>
+      <form id="prosesForm">
+        <input type="hidden" id="prosesIdInput">
+        <div class="form-group">
+          <label for="namaProsesInput">Nama Proses</label>
+          <input type="text" id="namaProsesInput" class="input-control" required placeholder="Contoh: Terima Nota, Packing, Kirim">
+        </div>
+        <div class="form-group">
+          <label for="urutanInput">Urutan Proses (1 - 4)</label>
+          <select id="urutanInput" class="input-control select-control" required>
+            <option value="1">1 (Pertama / Scan Awal)</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4 (Terakhir / Arsip)</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeProsesModal()">Batal</button>
+          <button type="submit" class="btn btn-primary">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    // Enforce admin authentication
+    if (!Auth.checkSession('admin')) {
+      // Auth check will redirect if failed
+    }
+
+    let selectedDivisiId = null;
+    let divisionsData = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadDivisions();
+
+      // Bind events
+      document.getElementById('addDivisiBtn').addEventListener('click', () => openDivisiModal());
+      document.getElementById('addProsesBtn').addEventListener('click', () => openProsesModal());
+      document.getElementById('divisiForm').addEventListener('submit', handleDivisiSubmit);
+      document.getElementById('prosesForm').addEventListener('submit', handleProsesSubmit);
+    });
+
+    // --- DIVISI ACTIONS ---
+
+    async function loadDivisions() {
+      try {
+        divisionsData = await apiFetch('/api/admin/divisi') || [];
+        renderDivisions();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderDivisions() {
+      const list = document.getElementById('divisiList');
+      const countSpan = document.getElementById('divisiCount');
+      
+      countSpan.textContent = divisionsData.length;
+
+      if (divisionsData.length === 0) {
+        list.innerHTML = `
+          <div style="text-align: center; color: var(--text-secondary); padding: 3rem 1rem;">
+            <span style="font-size: 2rem;">📭</span>
+            <p style="margin-top: 0.5rem;">Belum ada divisi yang dibuat. Klik tombol di atas untuk membuat.</p>
+          </div>
+        `;
+        return;
+      }
+
+      list.innerHTML = '';
+      divisionsData.forEach(d => {
+        const item = document.createElement('div');
+        item.className = `list-item ${selectedDivisiId === d.id ? 'active' : ''}`;
+        item.style.cursor = 'pointer';
+        if (selectedDivisiId === d.id) {
+          item.style.borderColor = 'var(--accent)';
+          item.style.background = 'rgba(59, 130, 246, 0.05)';
+        }
+
+        // Build list item details and action buttons
+        item.innerHTML = `
+          <div class="list-item-details" onclick="selectDivisi(${d.id}, '${d.nama_divisi}')">
+            <span class="list-item-title">${d.nama_divisi}</span>
+            <span class="list-item-subtitle">Username: ${d.username}</span>
+          </div>
+          <div class="list-item-actions">
+            <button class="btn-action btn-action-edit" onclick="event.stopPropagation(); editDivisi(${d.id})" title="Edit Divisi">✏️</button>
+            <button class="btn-action btn-action-delete" onclick="event.stopPropagation(); deleteDivisi(${d.id}, '${d.nama_divisi}')" title="Hapus Divisi">🗑️</button>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    function selectDivisi(id, name) {
+      selectedDivisiId = id;
+      renderDivisions(); // update active styling in list
+
+      document.getElementById('prosesPlaceholderSection').style.display = 'none';
+      const section = document.getElementById('prosesCardSection');
+      section.style.display = 'block';
+
+      document.getElementById('prosesCardSubtitle').textContent = `Divisi: ${name}`;
+      loadProcesses(id);
+    }
+
+    function openDivisiModal(div = null) {
+      const modal = document.getElementById('divisiModal');
+      const title = document.getElementById('divisiModalTitle');
+      const idInput = document.getElementById('divisiIdInput');
+      const nameInput = document.getElementById('namaDivisiInput');
+      const usernameInput = document.getElementById('usernameInput');
+      const passwordInput = document.getElementById('passwordInput');
+      const pLabel = document.getElementById('passwordLabel');
+      const pHelp = document.getElementById('passwordHelp');
+
+      modal.style.display = 'flex';
+
+      if (div) {
+        title.textContent = 'Edit Divisi';
+        idInput.value = div.id;
+        nameInput.value = div.nama_divisi;
+        usernameInput.value = div.username;
+        passwordInput.value = '';
+        passwordInput.required = false;
+        pLabel.textContent = 'Password (Opsional)';
+        pHelp.style.display = 'block';
+      } else {
+        title.textContent = 'Tambah Divisi Baru';
+        idInput.value = '';
+        nameInput.value = '';
+        usernameInput.value = '';
+        passwordInput.value = '';
+        passwordInput.required = true;
+        pLabel.textContent = 'Password';
+        pHelp.style.display = 'none';
+      }
+    }
+
+    function closeDivisiModal() {
+      document.getElementById('divisiModal').style.display = 'none';
+    }
+
+    async function handleDivisiSubmit(e) {
+      e.preventDefault();
+      
+      const id = document.getElementById('divisiIdInput').value;
+      const nama_divisi = document.getElementById('namaDivisiInput').value.trim();
+      const username = document.getElementById('usernameInput').value.trim();
+      const password = document.getElementById('passwordInput').value;
+
+      const body = { nama_divisi, username };
+      if (password && password.trim() !== '') {
+        body.password = password;
+      }
+
+      const method = id ? 'PUT' : 'POST';
+      const endpoint = id ? `/api/admin/divisi/${id}` : '/api/admin/divisi';
+
+      try {
+        const res = await apiFetch(endpoint, {
+          method,
+          body: JSON.stringify(body)
+        });
+
+        if (res) {
+          Toast.show(id ? 'Divisi berhasil diperbarui.' : 'Divisi berhasil ditambahkan.', 'success');
+          closeDivisiModal();
+          loadDivisions();
+          
+          // If editing selected divisi, update text
+          if (id && Number(id) === selectedDivisiId) {
+            document.getElementById('prosesCardSubtitle').textContent = `Divisi: ${nama_divisi}`;
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function editDivisi(id) {
+      const div = divisionsData.find(d => d.id === id);
+      if (div) {
+        openDivisiModal(div);
+      }
+    }
+
+    async function deleteDivisi(id, name) {
+      // Custom confirmation using custom modal style or confirm() fallback if needed,
+      // but guidelines specify: "never use browser alert() or confirm()".
+      // Let's build a quick glassmorphism confirmation box or simply execute it,
+      // but wait: for high-risk actions we can prompt. 
+      // Let's create an elegant DOM confirm box inside Toast or just do an inline prompt!
+      // Actually, let's create a beautiful custom confirm banner dynamically.
+      const confirmContainer = document.createElement('div');
+      confirmContainer.className = 'toast-container';
+      confirmContainer.style.bottom = 'auto';
+      confirmContainer.style.top = '20%';
+      
+      const dialog = document.createElement('div');
+      dialog.className = 'glass-card';
+      dialog.style.borderLeft = '4px solid var(--status-stuck)';
+      dialog.style.width = '350px';
+      dialog.style.margin = '0 auto';
+      dialog.innerHTML = `
+        <h3 style="margin-bottom: 0.5rem; font-size:1.05rem;">Konfirmasi Hapus</h3>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Apakah Anda yakin ingin menghapus divisi <strong>${name}</strong>? Seluruh data proses divisi ini akan ikut terhapus.</p>
+        <div style="display:flex; gap: 0.5rem; justify-content: flex-end;">
+          <button id="cancelDelBtn" class="btn btn-secondary btn-inline" style="height:32px; font-size:0.75rem;">Batal</button>
+          <button id="confirmDelBtn" class="btn btn-danger btn-inline" style="height:32px; font-size:0.75rem; background:#ef4444;">Hapus</button>
+        </div>
+      `;
+      confirmContainer.appendChild(dialog);
+      document.body.appendChild(confirmContainer);
+
+      document.getElementById('cancelDelBtn').onclick = () => {
+        document.body.removeChild(confirmContainer);
+      };
+
+      document.getElementById('confirmDelBtn').onclick = async () => {
+        document.body.removeChild(confirmContainer);
+        try {
+          const res = await apiFetch(`/api/admin/divisi/${id}`, { method: 'DELETE' });
+          if (res) {
+            Toast.show('Divisi berhasil dihapus.', 'success');
+            if (selectedDivisiId === id) {
+              selectedDivisiId = null;
+              document.getElementById('prosesCardSection').style.display = 'none';
+              document.getElementById('prosesPlaceholderSection').style.display = 'flex';
+            }
+            loadDivisions();
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      };
+    }
+
+    // --- PROSES ACTIONS ---
+
+    let processesData = [];
+
+    async function loadProcesses(divisiId) {
+      try {
+        processesData = await apiFetch(`/api/admin/divisi/${divisiId}/proses`) || [];
+        renderProcesses();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderProcesses() {
+      const list = document.getElementById('prosesList');
+      if (processesData.length === 0) {
+        list.innerHTML = `
+          <div style="text-align: center; color: var(--text-secondary); padding: 3rem 1rem;">
+            <span style="font-size: 2rem;">📋</span>
+            <p style="margin-top: 0.5rem;">Divisi ini belum memiliki alur proses.<br>Silakan tambah proses (maksimal 4).</p>
+          </div>
+        `;
+        return;
+      }
+
+      list.innerHTML = '';
+      processesData.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'list-item';
+        item.innerHTML = `
+          <div class="list-item-details" style="flex-direction:row; align-items:center; gap: 0.75rem;">
+            <span class="proses-badge-urutan">${p.urutan}</span>
+            <span class="list-item-title">${p.nama_proses}</span>
+          </div>
+          <div class="list-item-actions">
+            <button class="btn-action btn-action-edit" onclick="editProses(${p.id})" title="Edit Proses">✏️</button>
+            <button class="btn-action btn-action-delete" onclick="deleteProses(${p.id})" title="Hapus Proses">🗑️</button>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    function openProsesModal(pros = null) {
+      if (processesData.length >= 4 && !pros) {
+        Toast.show('Divisi hanya boleh memiliki maksimal 4 proses.', 'error');
+        return;
+      }
+
+      const modal = document.getElementById('prosesModal');
+      const title = document.getElementById('prosesModalTitle');
+      const idInput = document.getElementById('prosesIdInput');
+      const nameInput = document.getElementById('namaProsesInput');
+      const urutanInput = document.getElementById('urutanInput');
+
+      modal.style.display = 'flex';
+
+      if (pros) {
+        title.textContent = 'Edit Proses';
+        idInput.value = pros.id;
+        nameInput.value = pros.nama_proses;
+        urutanInput.value = pros.urutan;
+      } else {
+        title.textContent = 'Tambah Proses Baru';
+        idInput.value = '';
+        nameInput.value = '';
+        
+        // Auto-assign next order number if possible
+        const nextOrder = processesData.length + 1;
+        urutanInput.value = nextOrder <= 4 ? nextOrder : '1';
+      }
+    }
+
+    function closeProsesModal() {
+      document.getElementById('prosesModal').style.display = 'none';
+    }
+
+    async function handleProsesSubmit(e) {
+      e.preventDefault();
+      
+      const id = document.getElementById('prosesIdInput').value;
+      const nama_proses = document.getElementById('namaProsesInput').value.trim();
+      const urutan = document.getElementById('urutanInput').value;
+
+      const body = { nama_proses, urutan: Number(urutan) };
+      const method = id ? 'PUT' : 'POST';
+      const endpoint = id ? `/api/admin/proses/${id}` : `/api/admin/divisi/${selectedDivisiId}/proses`;
+
+      try {
+        const res = await apiFetch(endpoint, {
+          method,
+          body: JSON.stringify(body)
+        });
+
+        if (res) {
+          Toast.show(id ? 'Proses berhasil diperbarui.' : 'Proses berhasil ditambahkan.', 'success');
+          closeProsesModal();
+          loadProcesses(selectedDivisiId);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function editProses(id) {
+      const pros = processesData.find(p => p.id === id);
+      if (pros) {
+        openProsesModal(pros);
+      }
+    }
+
+    async function deleteProses(id) {
+      // Simple custom confirm
+      const confirmContainer = document.createElement('div');
+      confirmContainer.className = 'toast-container';
+      confirmContainer.style.bottom = 'auto';
+      confirmContainer.style.top = '20%';
+      
+      const dialog = document.createElement('div');
+      dialog.className = 'glass-card';
+      dialog.style.borderLeft = '4px solid var(--status-stuck)';
+      dialog.style.width = '350px';
+      dialog.style.margin = '0 auto';
+      dialog.innerHTML = `
+        <h3 style="margin-bottom: 0.5rem; font-size:1.05rem;">Konfirmasi Hapus</h3>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Apakah Anda yakin ingin menghapus alur proses ini?</p>
+        <div style="display:flex; gap: 0.5rem; justify-content: flex-end;">
+          <button id="cancelDelProBtn" class="btn btn-secondary btn-inline" style="height:32px; font-size:0.75rem;">Batal</button>
+          <button id="confirmDelProBtn" class="btn btn-danger btn-inline" style="height:32px; font-size:0.75rem; background:#ef4444;">Hapus</button>
+        </div>
+      `;
+      confirmContainer.appendChild(dialog);
+      document.body.appendChild(confirmContainer);
+
+      document.getElementById('cancelDelProBtn').onclick = () => {
+        document.body.removeChild(confirmContainer);
+      };
+
+      document.getElementById('confirmDelProBtn').onclick = async () => {
+        document.body.removeChild(confirmContainer);
+        try {
+          const res = await apiFetch(`/api/admin/proses/${id}`, { method: 'DELETE' });
+          if (res) {
+            Toast.show('Proses berhasil dihapus.', 'success');
+            loadProcesses(selectedDivisiId);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      };
+    }
+  </script>
+</body>
+</html>

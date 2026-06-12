@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Divisi — Nota Tracker</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <!-- Barcode Scanner via Camera Library -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span>Nota Tracker</span> Dashboard
+    </div>
+    <div class="nav-user">
+      <!-- Populated by app.js -->
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="dashboard-divisi-header">
+      <h1 id="divisiTitleHeader">Dashboard Staff</h1>
+      <p style="color: var(--text-secondary); font-size: 0.95rem;">Pilih alur proses di bawah ini untuk memulai pemindaian nota.</p>
+    </div>
+
+    <!-- Processes Cards Grid -->
+    <div class="proses-grid" id="prosesCardsGrid">
+      <!-- Populated via Javascript -->
+      <div style="text-align: center; grid-column: 1/-1; padding: 2rem; color: var(--text-secondary);">Memuat daftar proses...</div>
+    </div>
+
+    <!-- Scanner Input Box -->
+    <div class="scanner-section" id="scannerSection">
+      <div class="glass-card scanner-box">
+        <h3 style="margin-bottom: 0.5rem; font-size: 1.1rem;">
+          Pindai Nota: <span id="selectedProsesLabel" class="scanner-title-highlight">-</span>
+        </h3>
+        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.25rem;">Arahkan barcode scanner atau ketik no nota di bawah ini.</p>
+
+        <form id="scanForm">
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <input type="text" id="notaInput" class="input-control" required placeholder="Masukkan No Nota / Scan Barcode" style="text-align: center; font-size: 1.25rem; font-weight: 600; letter-spacing: 0.5px;" list="notaDatalist" autofocus>
+            <datalist id="notaDatalist"></datalist>
+          </div>
+          
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <button type="button" class="btn btn-secondary" id="startScanBtn" style="flex: 1;" onclick="startCameraScanner()">📷 Scan Kamera HP</button>
+            <button type="button" class="btn btn-danger" id="stopScanBtn" style="flex: 1; display: none;" onclick="stopCameraScanner()">🛑 Hentikan Scan</button>
+          </div>
+
+          <!-- Camera scanning region -->
+          <div id="reader" style="width: 100%; max-width: 380px; margin: 1rem auto; display: none; border: 2px solid var(--panel-border); border-radius: var(--border-radius); overflow: hidden;"></div>
+
+          <button type="submit" class="btn btn-primary" id="scanSubmitBtn">Kirim Scan / Submit</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Today's Scan History -->
+    <div class="glass-card" style="margin-top: 1.5rem;">
+      <div class="glass-card-header">
+        <h2>Riwayat Pemindaian Hari Ini</h2>
+        <span class="user-tag" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: var(--status-active);" id="todayScanCount">0 Scan</span>
+      </div>
+
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>No Nota</th>
+              <th>Proses</th>
+              <th style="width: 120px; text-align: right;">Jam</th>
+            </tr>
+          </thead>
+          <tbody id="scanHistoryBody">
+            <tr>
+              <td colspan="3" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Belum ada nota yang diproses hari ini.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script>
+    // Verify division session
+    if (!Auth.checkSession('divisi')) {
+      // Session helper handles redirects
+    }
+
+    const user = Auth.getUser();
+    let selectedProsesId = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      if (user) {
+        document.getElementById('divisiTitleHeader').textContent = `Divisi ${user.nama_divisi}`;
+        loadDivisionProcesses();
+        loadTodayScanHistory();
+        loadNotaDatalist();
+      }
+
+      // Bind events
+      document.getElementById('scanForm').addEventListener('submit', handleScanSubmit);
+      
+      // Auto focus logic
+      window.addEventListener('focus', focusInput);
+      document.body.addEventListener('click', focusInput);
+    });
+
+    // Bring cursor focus back to the input box automatically
+    function focusInput() {
+      const input = document.getElementById('notaInput');
+      const section = document.getElementById('scannerSection');
+      const reader = document.getElementById('reader');
+      if (input && section && section.style.display === 'block' && (!reader || reader.style.display !== 'block')) {
+        input.focus();
+      }
+    }
+
+    async function loadDivisionProcesses() {
+      try {
+        // We use the admin endpoint that has been secured to allow division users to get their own processes
+        const processes = await apiFetch(`/api/admin/divisi/${user.id}/proses`);
+        renderProcesses(processes || []);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderProcesses(processes) {
+      const grid = document.getElementById('prosesCardsGrid');
+      if (processes.length === 0) {
+        grid.innerHTML = `
+          <div style="text-align: center; grid-column: 1/-1; padding: 3rem 1rem; color: var(--text-secondary);">
+            <span style="font-size: 2rem;">⚠️</span>
+            <p style="margin-top: 0.5rem;">Belum ada alur proses yang didefinisikan untuk divisi Anda.<br>Hubungi Administrator untuk mengatur alur proses.</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = '';
+      processes.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'proses-card';
+        card.id = `proses-card-${p.id}`;
+        card.onclick = () => selectProses(p.id, p.nama_proses);
+        card.innerHTML = `
+          <span class="badge-urutan">${p.urutan}</span>
+          <span class="proses-card-title">${p.nama_proses}</span>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function selectProses(id, name) {
+      // Toggle active states in grid
+      document.querySelectorAll('.proses-card').forEach(c => c.classList.remove('active'));
+      const activeCard = document.getElementById(`proses-card-${id}`);
+      if (activeCard) {
+        activeCard.classList.add('active');
+      }
+
+      selectedProsesId = id;
+      
+      // Show scanner box
+      const scannerSection = document.getElementById('scannerSection');
+      scannerSection.style.display = 'block';
+      
+      // Update label
+      document.getElementById('selectedProsesLabel').textContent = name;
+
+      // Focus
+      setTimeout(focusInput, 50);
+    }
+
+    async function handleScanSubmit(e) {
+      if (e && e.preventDefault) e.preventDefault();
+      
+      const input = document.getElementById('notaInput');
+      const no_nota = input.value.trim();
+      const submitBtn = document.getElementById('scanSubmitBtn');
+
+      if (!no_nota || !selectedProsesId) return;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Menyimpan...';
+
+      try {
+        const res = await apiFetch('/api/divisi/scan', {
+          method: 'POST',
+          body: JSON.stringify({
+            no_nota,
+            proses_id: selectedProsesId
+          })
+        });
+
+        if (res && res.message) {
+          Toast.show(res.message, 'success');
+          input.value = ''; // clear input on success
+          loadTodayScanHistory();
+          loadNotaDatalist();
+        }
+      } catch (err) {
+        // App.js error handler already fires a Toast error message
+        // Make sure to select text for quick re-scan on failure
+        input.select();
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Kirim Scan / Submit';
+        // Force focus back immediately for barcode scanner
+        setTimeout(focusInput, 50);
+      }
+    }
+
+    async function loadTodayScanHistory() {
+      try {
+        const list = await apiFetch('/api/divisi/scan/today') || [];
+        renderTodayScanHistory(list);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function loadNotaDatalist() {
+      try {
+        const list = await apiFetch('/api/divisi/scan/nota-list') || [];
+        const datalist = document.getElementById('notaDatalist');
+        datalist.innerHTML = '';
+        list.forEach(nota => {
+          const option = document.createElement('option');
+          option.value = nota;
+          datalist.appendChild(option);
+        });
+      } catch (err) {
+        console.error('Failed to load datalist:', err);
+      }
+    }
+
+    let html5QrCode = null;
+
+    async function startCameraScanner() {
+      const readerDiv = document.getElementById('reader');
+      readerDiv.style.display = 'block';
+
+      html5QrCode = new Html5Qrcode("reader");
+
+      const config = { 
+        fps: 15, 
+        qrbox: (width, height) => {
+          const minSize = Math.min(width, height);
+          return {
+            width: Math.floor(width * 0.85),
+            height: Math.floor(minSize * 0.45)
+          };
+        }
+      };
+
+      try {
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          config,
+          (decodedText, decodedResult) => {
+            const input = document.getElementById('notaInput');
+            input.value = decodedText;
+            stopCameraScanner();
+            
+            // Auto submit form
+            handleScanSubmit();
+          },
+          (errorMessage) => {
+            // Quietly continue searching for barcode in feed
+          }
+        );
+
+        document.getElementById('startScanBtn').style.display = 'none';
+        document.getElementById('stopScanBtn').style.display = 'block';
+      } catch (err) {
+        console.error("Camera access failed:", err);
+        Toast.show("Gagal mengakses kamera. Pastikan izin kamera telah diberikan.", "error");
+        readerDiv.style.display = 'none';
+      }
+    }
+
+    async function stopCameraScanner() {
+      if (html5QrCode) {
+        try {
+          await html5QrCode.stop();
+        } catch (err) {
+          console.warn("Scanner stop warning:", err);
+        }
+        html5QrCode = null;
+      }
+      document.getElementById('reader').style.display = 'none';
+      document.getElementById('startScanBtn').style.display = 'block';
+      document.getElementById('stopScanBtn').style.display = 'none';
+    }
+
+    function renderTodayScanHistory(scans) {
+      const body = document.getElementById('scanHistoryBody');
+      const countLabel = document.getElementById('todayScanCount');
+      
+      countLabel.textContent = `${scans.length} Scan`;
+
+      if (scans.length === 0) {
+        body.innerHTML = `
+          <tr>
+            <td colspan="3" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Belum ada nota yang diproses hari ini.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      body.innerHTML = '';
+      scans.forEach(s => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td style="font-weight: 600; letter-spacing: 0.2px;">${s.no_nota}</td>
+          <td><span class="user-tag" style="display:inline-block; font-size: 0.75rem; padding: 0.15rem 0.5rem;">${s.nama_proses}</span></td>
+          <td style="text-align: right; font-family: monospace; color: var(--text-secondary); font-size: 0.85rem;">${s.scan_time}</td>
+        `;
+        body.appendChild(row);
+      });
+    }
+  </script>
+</body>
+</html>
