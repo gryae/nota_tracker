@@ -19,7 +19,7 @@ function canAccessDivisiProses(req, res, next) {
 // GET /api/admin/divisi - Get all divisions (Admin OR Division users)
 router.get('/divisi', verifyToken, async (req, res) => {
   try {
-    const divisions = await db.query('SELECT id, nama_divisi, username, created_at FROM divisi');
+    const divisions = await db.query('SELECT id, nama_divisi, username, limit_perhatian, limit_tertahan, created_at FROM divisi');
     return res.json(divisions);
   } catch (err) {
     console.error('Error fetching divisions:', err.message);
@@ -29,7 +29,7 @@ router.get('/divisi', verifyToken, async (req, res) => {
 
 // POST /api/admin/divisi - Create division (max 10, Admin only)
 router.post('/divisi', isAdmin, async (req, res) => {
-  const { nama_divisi, username, password } = req.body;
+  const { nama_divisi, username, password, limit_perhatian, limit_tertahan } = req.body;
 
   if (!nama_divisi || !username || !password) {
     return res.status(400).json({ error: 'Semua field (nama_divisi, username, password) wajib diisi.' });
@@ -50,11 +50,14 @@ router.post('/divisi', isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Username sudah digunakan oleh divisi lain.' });
     }
 
+    const limitPerhatian = limit_perhatian !== undefined ? Number(limit_perhatian) : 4;
+    const limitTertahan = limit_tertahan !== undefined ? Number(limit_tertahan) : 24;
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
     const result = await db.query(
-      'INSERT INTO divisi (nama_divisi, username, password) VALUES (?, ?, ?)',
-      [nama_divisi, username, hashedPassword]
+      'INSERT INTO divisi (nama_divisi, username, password, limit_perhatian, limit_tertahan) VALUES (?, ?, ?, ?, ?)',
+      [nama_divisi, username, hashedPassword, limitPerhatian, limitTertahan]
     );
 
     return res.status(201).json({
@@ -70,7 +73,7 @@ router.post('/divisi', isAdmin, async (req, res) => {
 // PUT /api/admin/divisi/:id - Update division (Admin only)
 router.put('/divisi/:id', isAdmin, async (req, res) => {
   const { id } = req.params;
-  const { nama_divisi, username, password } = req.body;
+  const { nama_divisi, username, password, limit_perhatian, limit_tertahan } = req.body;
 
   if (!nama_divisi || !username) {
     return res.status(400).json({ error: 'Nama divisi dan username wajib diisi.' });
@@ -83,17 +86,20 @@ router.put('/divisi/:id', isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Username sudah digunakan oleh divisi lain.' });
     }
 
+    const limitPerhatian = limit_perhatian !== undefined ? Number(limit_perhatian) : 4;
+    const limitTertahan = limit_tertahan !== undefined ? Number(limit_tertahan) : 24;
+
     let result;
     if (password && password.trim() !== '') {
       const hashedPassword = await bcrypt.hash(password, 10);
       result = await db.query(
-        'UPDATE divisi SET nama_divisi = ?, username = ?, password = ? WHERE id = ?',
-        [nama_divisi, username, hashedPassword, id]
+        'UPDATE divisi SET nama_divisi = ?, username = ?, password = ?, limit_perhatian = ?, limit_tertahan = ? WHERE id = ?',
+        [nama_divisi, username, hashedPassword, limitPerhatian, limitTertahan, id]
       );
     } else {
       result = await db.query(
-        'UPDATE divisi SET nama_divisi = ?, username = ? WHERE id = ?',
-        [nama_divisi, username, id]
+        'UPDATE divisi SET nama_divisi = ?, username = ?, limit_perhatian = ?, limit_tertahan = ? WHERE id = ?',
+        [nama_divisi, username, limitPerhatian, limitTertahan, id]
       );
     }
 
@@ -191,6 +197,41 @@ router.delete('/proses/:id', isAdmin, async (req, res) => {
   } catch (err) {
     console.error('Error deleting process:', err.message);
     return res.status(500).json({ error: 'Gagal menghapus proses.' });
+  }
+});
+
+// DELETE /api/admin/scan-log/:id - Delete scan log entry (Admin only)
+router.delete('/scan-log/:id', isAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.query('DELETE FROM scan_log WHERE id = ?', [id]);
+    return res.json({ message: 'Langkah proses scan berhasil dihapus.' });
+  } catch (err) {
+    console.error('Error deleting scan log:', err.message);
+    return res.status(500).json({ error: 'Gagal menghapus langkah proses scan.' });
+  }
+});
+
+// POST /api/admin/purge-scan-log - Purge scan logs up to date (Admin only)
+router.post('/purge-scan-log', isAdmin, async (req, res) => {
+  const { date } = req.body;
+  if (!date) {
+    return res.status(400).json({ error: 'Tanggal pembersihan wajib diisi.' });
+  }
+  try {
+    // Delete logs on or before selected date (23:59:59)
+    const result = await db.query(
+      'DELETE FROM scan_log WHERE scanned_at <= ?',
+      [`${date} 23:59:59`]
+    );
+    // Handle SQL return (result can be different for fallback or mysql)
+    const affectedRows = result && result.affectedRows !== undefined ? result.affectedRows : 0;
+    return res.json({ 
+      message: `Pembersihan berhasil. Berhasil menghapus ${affectedRows} record log scan sebelum tanggal ${date}.` 
+    });
+  } catch (err) {
+    console.error('Error purging scan logs:', err.message);
+    return res.status(500).json({ error: 'Gagal membersihkan data log scan.' });
   }
 });
 

@@ -35,6 +35,27 @@
             <div style="text-align: center; color: var(--text-secondary); padding: 2rem;">Loading divisi...</div>
           </div>
         </div>
+
+        <!-- Data Purging Card -->
+        <div class="glass-card" style="margin-top: 1.5rem;">
+          <div class="glass-card-header">
+            <h2>Pembersihan Data Log Scan</h2>
+          </div>
+          <div style="padding: 0 1rem 1rem; margin-top: -0.5rem;">
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.45;">
+              Hapus permanen seluruh data riwayat scan nota yang tercatat <strong>pada dan sebelum</strong> tanggal yang dipilih. Tindakan ini tidak dapat dibatalkan.
+            </p>
+            <form id="purgeForm">
+              <div class="form-group">
+                <label for="purgeDateInput">Pilih Batas Tanggal</label>
+                <input type="date" id="purgeDateInput" class="input-control" required>
+              </div>
+              <button type="submit" class="btn btn-danger" style="background: #ef4444; border-color: #ef4444; width: 100%; height: 40px; font-weight: 700; margin-top: 0.5rem;">
+                ⚠️ Hapus Log Riwayat Scan
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
 
       <!-- RIGHT COLUMN: Selected Division Details & Processes -->
@@ -85,6 +106,14 @@
           <label for="passwordInput" id="passwordLabel">Password</label>
           <input type="password" id="passwordInput" class="input-control" placeholder="Kata sandi login staff">
           <span id="passwordHelp" style="font-size:0.75rem; color:var(--text-secondary); display:none; margin-top:0.25rem;">Kosongkan jika tidak ingin mengubah password.</span>
+        </div>
+        <div class="form-group">
+          <label for="limitPerhatianInput">Waktu Perhatian (Menit)</label>
+          <input type="number" id="limitPerhatianInput" class="input-control" required min="1" value="240" placeholder="Contoh: 240">
+        </div>
+        <div class="form-group">
+          <label for="limitTertahanInput">Waktu Tertahan (Menit)</label>
+          <input type="number" id="limitTertahanInput" class="input-control" required min="1" value="1440" placeholder="Contoh: 1440">
         </div>
         <div class="form-actions">
           <button type="button" class="btn btn-secondary" onclick="closeDivisiModal()">Batal</button>
@@ -142,6 +171,7 @@
       document.getElementById('addProsesBtn').addEventListener('click', () => openProsesModal());
       document.getElementById('divisiForm').addEventListener('submit', handleDivisiSubmit);
       document.getElementById('prosesForm').addEventListener('submit', handleProsesSubmit);
+      document.getElementById('purgeForm').addEventListener('submit', handlePurgeSubmit);
     });
 
     // --- DIVISI ACTIONS ---
@@ -185,7 +215,7 @@
         item.innerHTML = `
           <div class="list-item-details" onclick="selectDivisi(${d.id}, '${d.nama_divisi}')">
             <span class="list-item-title">${d.nama_divisi}</span>
-            <span class="list-item-subtitle">Username: ${d.username}</span>
+            <span class="list-item-subtitle">Username: ${d.username} | 🟡 ${d.limit_perhatian}m · 🔴 ${d.limit_tertahan}m</span>
           </div>
           <div class="list-item-actions">
             <button class="btn-action btn-action-edit" onclick="event.stopPropagation(); editDivisi(${d.id})" title="Edit Divisi">✏️</button>
@@ -229,6 +259,8 @@
         passwordInput.required = false;
         pLabel.textContent = 'Password (Opsional)';
         pHelp.style.display = 'block';
+        document.getElementById('limitPerhatianInput').value = div.limit_perhatian !== undefined ? div.limit_perhatian : 4;
+        document.getElementById('limitTertahanInput').value = div.limit_tertahan !== undefined ? div.limit_tertahan : 24;
       } else {
         title.textContent = 'Tambah Divisi Baru';
         idInput.value = '';
@@ -238,6 +270,8 @@
         passwordInput.required = true;
         pLabel.textContent = 'Password';
         pHelp.style.display = 'none';
+        document.getElementById('limitPerhatianInput').value = 4;
+        document.getElementById('limitTertahanInput').value = 24;
       }
     }
 
@@ -252,8 +286,10 @@
       const nama_divisi = document.getElementById('namaDivisiInput').value.trim();
       const username = document.getElementById('usernameInput').value.trim();
       const password = document.getElementById('passwordInput').value;
+      const limit_perhatian = Number(document.getElementById('limitPerhatianInput').value) || 4;
+      const limit_tertahan = Number(document.getElementById('limitTertahanInput').value) || 24;
 
-      const body = { nama_divisi, username };
+      const body = { nama_divisi, username, limit_perhatian, limit_tertahan };
       if (password && password.trim() !== '') {
         body.password = password;
       }
@@ -280,6 +316,53 @@
       } catch (err) {
         console.error(err);
       }
+    }
+
+    async function handlePurgeSubmit(e) {
+      e.preventDefault();
+      const date = document.getElementById('purgeDateInput').value;
+      if (!date) return;
+
+      const confirmContainer = document.createElement('div');
+      confirmContainer.className = 'toast-container';
+      confirmContainer.style.bottom = 'auto';
+      confirmContainer.style.top = '20%';
+      
+      const dialog = document.createElement('div');
+      dialog.className = 'glass-card';
+      dialog.style.borderLeft = '4px solid var(--status-stuck)';
+      dialog.style.width = '350px';
+      dialog.style.margin = '0 auto';
+      dialog.innerHTML = `
+        <h3 style="margin-bottom: 0.5rem; font-size:1.05rem; color:#ef4444;">⚠️ Konfirmasi Pembersihan</h3>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Apakah Anda yakin ingin menghapus permanen seluruh log scan <strong>pada dan sebelum tanggal ${date}</strong>?</p>
+        <div style="display:flex; gap: 0.5rem; justify-content: flex-end;">
+          <button id="cancelPurgeBtn" class="btn btn-secondary btn-inline" style="height:32px; font-size:0.75rem;">Batal</button>
+          <button id="confirmPurgeBtn" class="btn btn-danger btn-inline" style="height:32px; font-size:0.75rem; background:#ef4444; border-color:#ef4444; color:white;">Ya, Hapus Permanen</button>
+        </div>
+      `;
+      confirmContainer.appendChild(dialog);
+      document.body.appendChild(confirmContainer);
+
+      document.getElementById('cancelPurgeBtn').onclick = () => {
+        document.body.removeChild(confirmContainer);
+      };
+
+      document.getElementById('confirmPurgeBtn').onclick = async () => {
+        document.body.removeChild(confirmContainer);
+        try {
+          const res = await apiFetch('/api/admin/purge-scan-log', {
+            method: 'POST',
+            body: JSON.stringify({ date })
+          });
+          if (res && res.message) {
+            Toast.show(res.message, 'success');
+            document.getElementById('purgeDateInput').value = '';
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      };
     }
 
     function editDivisi(id) {

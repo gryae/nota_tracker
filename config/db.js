@@ -38,6 +38,22 @@ function loadFallbackDb() {
       fallbackDb.divisi = fallbackDb.divisi || [];
       fallbackDb.proses = fallbackDb.proses || [];
       fallbackDb.scan_log = fallbackDb.scan_log || [];
+
+      // Auto migrate pre-existing hour limits (4 & 24) to minute limits (240 & 1440)
+      let updated = false;
+      fallbackDb.divisi.forEach(d => {
+        if (d.limit_perhatian === 4) {
+          d.limit_perhatian = 240;
+          updated = true;
+        }
+        if (d.limit_tertahan === 24) {
+          d.limit_tertahan = 1440;
+          updated = true;
+        }
+      });
+      if (updated) {
+        saveFallbackDb();
+      }
     } catch (err) {
       console.error('❌ Failed to parse fallback database JSON, using empty template.');
     }
@@ -68,6 +84,25 @@ async function initDb() {
     // Test the connection
     const conn = await pool.getConnection();
     console.log('✅ Connected to MySQL database successfully.');
+
+    // Auto migrate limit_perhatian & limit_tertahan columns if they don't exist
+    try {
+      await conn.execute('SELECT limit_perhatian, limit_tertahan FROM divisi LIMIT 1');
+    } catch (e) {
+      console.log('🌱 Migration: Adding limit_perhatian & limit_tertahan columns to divisi table...');
+      await conn.execute('ALTER TABLE divisi ADD COLUMN limit_perhatian INT NOT NULL DEFAULT 240');
+      await conn.execute('ALTER TABLE divisi ADD COLUMN limit_tertahan INT NOT NULL DEFAULT 1440');
+      console.log('✅ Migration: limit_perhatian and limit_tertahan columns added.');
+    }
+
+    // Migrate existing hour-based settings to minute-based settings
+    try {
+      await conn.execute('UPDATE divisi SET limit_perhatian = 240 WHERE limit_perhatian = 4');
+      await conn.execute('UPDATE divisi SET limit_tertahan = 1440 WHERE limit_tertahan = 24');
+    } catch (e) {
+      console.warn('Migration warning conversion from hours to minutes failed:', e.message);
+    }
+
     conn.release();
     isFallbackActive = false;
   } catch (err) {
@@ -143,7 +178,7 @@ async function seedDefaultData() {
       for (const d of seedData) {
         const hashedPassword = await bcrypt.hash(d.password, 10);
         const res = await query(
-          'INSERT INTO divisi (nama_divisi, username, password) VALUES (?, ?, ?)',
+          'INSERT INTO divisi (nama_divisi, username, password, limit_perhatian, limit_tertahan) VALUES (?, ?, ?, 240, 1440)',
           [d.nama_divisi, d.username, hashedPassword]
         );
         
@@ -204,12 +239,14 @@ function queryFallback(sql, params) {
   }
 
   if (cleanSql.includes('insert into divisi')) {
-    // INSERT INTO divisi (nama_divisi, username, password) VALUES (?, ?, ?)
+    // INSERT INTO divisi (nama_divisi, username, password, limit_perhatian, limit_tertahan) VALUES (?, ?, ?, ?, ?)
     const newDivisi = {
       id: fallbackDb.divisi.length > 0 ? Math.max(...fallbackDb.divisi.map(d => d.id)) + 1 : 1,
       nama_divisi: params[0],
       username: params[1],
       password: params[2],
+      limit_perhatian: params[3] !== undefined ? Number(params[3]) : 240,
+      limit_tertahan: params[4] !== undefined ? Number(params[4]) : 1440,
       created_at: new Date().toISOString()
     };
     fallbackDb.divisi.push(newDivisi);
@@ -218,14 +255,21 @@ function queryFallback(sql, params) {
   }
 
   if (cleanSql.includes('update divisi')) {
-    // UPDATE divisi SET nama_divisi = ?, username = ?, password = ? WHERE id = ?
-    // OR UPDATE divisi SET nama_divisi = ?, username = ? WHERE id = ?
+    // UPDATE divisi SET nama_divisi = ?, username = ?, password = ?, limit_perhatian = ?, limit_tertahan = ? WHERE id = ?
+    // OR UPDATE divisi SET nama_divisi = ?, username = ?, limit_perhatian = ?, limit_tertahan = ? WHERE id = ?
     const id = params[params.length - 1];
     const index = fallbackDb.divisi.findIndex(d => d.id === Number(id));
     if (index !== -1) {
       fallbackDb.divisi[index].nama_divisi = params[0];
       fallbackDb.divisi[index].username = params[1];
-      if (params.length === 4) {
+      if (params.length === 6) {
+        fallbackDb.divisi[index].password = params[2];
+        fallbackDb.divisi[index].limit_perhatian = Number(params[3]);
+        fallbackDb.divisi[index].limit_tertahan = Number(params[4]);
+      } else if (params.length === 5) {
+        fallbackDb.divisi[index].limit_perhatian = Number(params[2]);
+        fallbackDb.divisi[index].limit_tertahan = Number(params[3]);
+      } else if (params.length === 4) {
         fallbackDb.divisi[index].password = params[2];
       }
       saveFallbackDb();
@@ -296,6 +340,24 @@ function queryFallback(sql, params) {
   }
 
   // 3. SCAN LOGS
+  if (cleanSql.includes('delete from scan_log')) {
+    if (cleanSql.includes('scanned_at <= ?')) {
+      const limitDate = new Date(params[0]);
+      const initialCount = fallbackDb.scan_log.length;
+      fallbackDb.scan_log = fallbackDb.scan_log.filter(s => new Date(s.scanned_at) > limitDate);
+      saveFallbackDb();
+      const affectedRows = initialCount - fallbackDb.scan_log.length;
+      return { affectedRows };
+    } else if (cleanSql.includes('where id = ?')) {
+      const id = Number(params[0]);
+      const initialCount = fallbackDb.scan_log.length;
+      fallbackDb.scan_log = fallbackDb.scan_log.filter(s => s.id !== id);
+      saveFallbackDb();
+      const affectedRows = initialCount - fallbackDb.scan_log.length;
+      return { affectedRows };
+    }
+  }
+
   if (cleanSql.includes('insert into scan_log')) {
     // INSERT INTO scan_log (no_nota, divisi_id, proses_id) VALUES (?, ?, ?)
     const newScan = {
@@ -367,6 +429,8 @@ function queryFallback(sql, params) {
       proses_id: s.proses_id,
       nama_proses: pros.nama_proses || 'Unknown',
       urutan: pros.urutan || 1,
+      limit_perhatian: div.limit_perhatian !== undefined ? div.limit_perhatian : 240,
+      limit_tertahan: div.limit_tertahan !== undefined ? div.limit_tertahan : 1440,
       scanned_at: s.scanned_at
     };
   });

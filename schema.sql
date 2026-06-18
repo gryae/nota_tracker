@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS divisi (
   nama_divisi  VARCHAR(100) NOT NULL,
   username     VARCHAR(50)  UNIQUE NOT NULL,
   password     VARCHAR(255) NOT NULL,
+  limit_perhatian INT NOT NULL DEFAULT 4,
+  limit_tertahan  INT NOT NULL DEFAULT 24,
   created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
  

@@ -1053,6 +1053,51 @@
 
   <script src="assets/app.js"></script>
   <script>
+    // Audio Beep Helper using Web Audio API
+    let audioCtx = null;
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+    // Resume audio context on first user click or key press
+    document.addEventListener('click', initAudio, { once: true });
+    document.addEventListener('keydown', initAudio, { once: true });
+
+    function playBeep(type = 'success') {
+      try {
+        initAudio();
+        if (!audioCtx) return;
+
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        if (type === 'success') {
+          // Nice high pitch beep for success
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime);
+          gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+          oscillator.start();
+          oscillator.stop(audioCtx.currentTime + 0.12);
+        } else {
+          // Low warning buzz for error
+          oscillator.type = 'sawtooth';
+          oscillator.frequency.setValueAtTime(180, audioCtx.currentTime);
+          gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          oscillator.start();
+          oscillator.stop(audioCtx.currentTime + 0.3);
+        }
+      } catch (e) {
+        console.warn('Audio Context beep failed:', e);
+      }
+    }
+
     // ── AUTH CHECK ──
     if (!Auth.checkSession()) { /* app.js handles redirect */ }
 
@@ -1160,7 +1205,10 @@
       const submitBtn = document.getElementById('scanSubmitBtn');
 
       if (!no_nota || !selectedProsesId) {
-        if (!selectedProsesId) Toast.show('Pilih proses terlebih dahulu.', 'error');
+        if (!selectedProsesId) {
+          playBeep('error');
+          Toast.show('Pilih proses terlebih dahulu.', 'error');
+        }
         return;
       }
 
@@ -1174,6 +1222,7 @@
         });
 
         if (res && res.message) {
+          playBeep('success');
           Toast.show(res.message, 'success');
           input.value = '';
           loadTodayScanHistory();
@@ -1181,6 +1230,7 @@
           loadLaporanData(); // refresh right panel
         }
       } catch (err) {
+        playBeep('error');
         input.select();
       } finally {
         submitBtn.disabled = false;
@@ -1411,8 +1461,9 @@
     }
 
     function formatElapsed(hours) {
-      if (hours < 1) return '<span style="color:#10b981;">Baru saja</span>';
-      if (hours < 4) return `<span style="color:#10b981;">${Math.round(hours)} jam lalu</span>`;
+      const minutes = Math.round(hours * 60);
+      if (minutes < 1) return '<span style="color:#10b981;">Baru saja</span>';
+      if (minutes < 60) return `<span style="color:#10b981;">${minutes} menit lalu</span>`;
       if (hours < 24) return `<span style="color:#f59e0b;">${Math.round(hours)} jam lalu</span>`;
       const days = Math.floor(hours / 24);
       const h = Math.round(hours % 24);
@@ -1531,6 +1582,7 @@
           body: JSON.stringify({ no_nota: noNota, proses_id: prosesId })
         });
         if (res && res.message) {
+          playBeep('success');
           Toast.show(res.message, 'success');
           // Refresh modal detail
           openDetailModal(noNota);
@@ -1538,6 +1590,7 @@
           loadLaporanData();
         }
       } catch (err) {
+        playBeep('error');
         // Toast already shown by apiFetch
       }
     }

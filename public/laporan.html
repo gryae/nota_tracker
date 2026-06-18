@@ -181,15 +181,15 @@
           <div class="stat-val stat-val-all" id="cntAll">0</div>
         </div>
         <div class="summary-stat-card" id="statCardAktif" onclick="filterSummary('aktif')">
-          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--status-active); font-weight: 700;">🟢 Aktif (&le; 4 Jam)</div>
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--status-active); font-weight: 700;">🟢 Aktif</div>
           <div class="stat-val stat-val-aktif" id="cntAktif">0</div>
         </div>
         <div class="summary-stat-card" id="statCardPerhatian" onclick="filterSummary('perhatian')">
-          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--status-attention); font-weight: 700;">🟡 Perhatian (4-24 Jam)</div>
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--status-attention); font-weight: 700;">🟡 Perhatian</div>
           <div class="stat-val stat-val-perhatian" id="cntPerhatian">0</div>
         </div>
         <div class="summary-stat-card" id="statCardTertahan" onclick="filterSummary('tertahan')">
-          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--status-stuck); font-weight: 700;">🔴 Tertahan (&gt; 24 Jam)</div>
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--status-stuck); font-weight: 700;">🔴 Tertahan</div>
           <div class="stat-val stat-val-tertahan" id="cntTertahan">0</div>
         </div>
       </div>
@@ -311,9 +311,24 @@
 
     function renderLaporan(rows) {
       const body = document.getElementById('laporanTableBody');
+      const user = Auth.getUser();
+      const isAdmin = user && user.role === 'admin';
+
+      // Update table header if admin
+      const theadTr = document.querySelector('.data-table thead tr');
+      if (theadTr) {
+        theadTr.innerHTML = `
+          <th>No Nota</th>
+          <th>Divisi</th>
+          <th>Proses</th>
+          <th>Tanggal</th>
+          <th>Jam</th>
+          ${isAdmin ? '<th style="text-align: right; padding-right: 1.5rem;">Aksi</th>' : ''}
+        `;
+      }
       
       if (rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Tidak ada data yang cocok dengan kriteria filter.</td></tr>';
+        body.innerHTML = `<tr><td colspan="${isAdmin ? 6 : 5}" style="text-align: center; color: var(--text-secondary); padding: 2rem;">Tidak ada data yang cocok dengan kriteria filter.</td></tr>`;
         return;
       }
 
@@ -329,11 +344,11 @@
           headerRow.className = 'group-header-row';
           
           const warningBadge = r.isStuck24h 
-            ? ' <span class="status-badge status-badge-tertahan" style="margin-left:1rem; font-size:0.65rem; padding: 0.15rem 0.4rem;"><span class="dot-indicator"></span>Tertahan &gt; 24 Jam</span>' 
+            ? ' <span class="status-badge status-badge-tertahan" style="margin-left:1rem; font-size:0.65rem; padding: 0.15rem 0.4rem;"><span class="dot-indicator"></span>Tertahan</span>' 
             : '';
 
           headerRow.innerHTML = `
-            <td colspan="5" class="group-header-cell">
+            <td colspan="${isAdmin ? 6 : 5}" class="group-header-cell">
               📁 Invoice Nota: <strong style="letter-spacing:0.5px;">${r.no_nota}</strong> ${warningBadge}
             </td>
           `;
@@ -345,6 +360,17 @@
         if (r.isStuck24h) {
           row.className = 'row-danger';
         }
+
+        let deleteBtnHtml = '';
+        if (isAdmin) {
+          deleteBtnHtml = `
+            <td style="text-align: right; padding-right: 1.5rem;">
+              <button class="btn-action btn-action-delete" onclick="deleteScanLog(${r.id}, '${r.no_nota}')" style="background:none; border:none; cursor:pointer;" title="Hapus langkah proses ini">
+                🗑️
+              </button>
+            </td>
+          `;
+        }
         
         row.innerHTML = `
           <td style="padding-left: 2rem; color: var(--text-secondary); font-size:0.85rem;">Journey step:</td>
@@ -352,9 +378,50 @@
           <td><span class="user-tag" style="background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.08); font-size: 0.75rem; padding: 0.15rem 0.5rem; display: inline-block;">${r.nama_proses}</span></td>
           <td>${r.tanggal}</td>
           <td style="font-family: monospace; color: var(--text-secondary); font-size: 0.85rem;">${r.jam}</td>
+          ${deleteBtnHtml}
         `;
         body.appendChild(row);
       });
+    }
+
+    async function deleteScanLog(id, noNota) {
+      const confirmContainer = document.createElement('div');
+      confirmContainer.className = 'toast-container';
+      confirmContainer.style.bottom = 'auto';
+      confirmContainer.style.top = '20%';
+      
+      const dialog = document.createElement('div');
+      dialog.className = 'glass-card';
+      dialog.style.borderLeft = '4px solid var(--status-stuck)';
+      dialog.style.width = '350px';
+      dialog.style.margin = '0 auto';
+      dialog.innerHTML = `
+        <h3 style="margin-bottom: 0.5rem; font-size:1.05rem; color:#ef4444;">Konfirmasi Hapus</h3>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">Apakah Anda yakin ingin menghapus langkah proses ini untuk nota <strong>${noNota}</strong>?</p>
+        <div style="display:flex; gap: 0.5rem; justify-content: flex-end;">
+          <button id="cancelDelLogBtn" class="btn btn-secondary btn-inline" style="height:32px; font-size:0.75rem;">Batal</button>
+          <button id="confirmDelLogBtn" class="btn btn-danger btn-inline" style="height:32px; font-size:0.75rem; background:#ef4444; border-color:#ef4444; color:white;">Hapus</button>
+        </div>
+      `;
+      confirmContainer.appendChild(dialog);
+      document.body.appendChild(confirmContainer);
+
+      document.getElementById('cancelDelLogBtn').onclick = () => {
+        document.body.removeChild(confirmContainer);
+      };
+
+      document.getElementById('confirmDelLogBtn').onclick = async () => {
+        document.body.removeChild(confirmContainer);
+        try {
+          const res = await apiFetch(`/api/admin/scan-log/${id}`, { method: 'DELETE' });
+          if (res) {
+            Toast.show('Langkah proses scan berhasil dihapus.', 'success');
+            loadLaporanData();
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      };
     }
 
     function resetFilters() {
@@ -491,8 +558,11 @@
         
         // Duration text
         let durationText = '';
-        if (r.hours_elapsed < 1) {
+        const minutesElapsed = Math.round(r.hours_elapsed * 60);
+        if (minutesElapsed < 1) {
           durationText = 'Baru saja';
+        } else if (minutesElapsed < 60) {
+          durationText = `${minutesElapsed} menit lalu`;
         } else if (r.hours_elapsed < 24) {
           durationText = `${Math.round(r.hours_elapsed)} jam lalu`;
         } else {
