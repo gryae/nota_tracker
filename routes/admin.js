@@ -1,8 +1,28 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
 const db = require('../config/db');
 const { verifyToken, isAdmin } = require('../middleware/auth');
+
+// Admin credentials file path (overrides server.js hardcoded values)
+const ADMIN_CRED_PATH = path.join(__dirname, '../admin_credentials.json');
+
+function readAdminCredentials() {
+  if (fs.existsSync(ADMIN_CRED_PATH)) {
+    try {
+      return JSON.parse(fs.readFileSync(ADMIN_CRED_PATH, 'utf8'));
+    } catch (e) {}
+  }
+  // Fall back to server.js values if no file exists
+  const server = require('../server');
+  return { username: server.ADMIN_USER, password: null }; // password=null means use server.js plaintext
+}
+
+function writeAdminCredentials(creds) {
+  fs.writeFileSync(ADMIN_CRED_PATH, JSON.stringify(creds, null, 2), 'utf8');
+}
 
 // Custom permission middleware for getting processes
 // Allows either Admin OR the specific division user itself to get processes
@@ -152,6 +172,21 @@ router.post('/divisi/:id/proses', isAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Batas maksimum proses untuk divisi ini tercapai (maksimal 4 proses).' });
     }
 
+    // CETAK restriction: only Kasir or Admin BLK divisions may have CETAK process
+    if (nama_proses.trim().toUpperCase() === 'CETAK') {
+      const divisiRows = await db.query('SELECT nama_divisi FROM divisi WHERE id = ?', [id]);
+      if (divisiRows.length === 0) {
+        return res.status(404).json({ error: 'Divisi tidak ditemukan.' });
+      }
+      const namaDivisi = divisiRows[0].nama_divisi.toLowerCase();
+      const isKasirOrAdminBLK = namaDivisi.includes('kasir') || namaDivisi.includes('admin blk');
+      if (!isKasirOrAdminBLK) {
+        return res.status(403).json({
+          error: `Proses CETAK hanya diperbolehkan untuk divisi Kasir atau Admin BLK. Divisi "${divisiRows[0].nama_divisi}" tidak memiliki izin ini.`
+        });
+      }
+    }
+
     const result = await db.query(
       'INSERT INTO proses (divisi_id, nama_proses, urutan) VALUES (?, ?, ?)',
       [id, nama_proses, urutan]
@@ -233,6 +268,51 @@ router.post('/purge-scan-log', isAdmin, async (req, res) => {
     console.error('Error purging scan logs:', err.message);
     return res.status(500).json({ error: 'Gagal membersihkan data log scan.' });
   }
+});
+
+// GET /api/admin/credentials - Get current admin username (password not returned)
+router.get('/credentials', isAdmin, (req, res) => {
+  const creds = readAdminCredentials();
+  return res.json({ username: creds.username });
+});
+
+// PUT /api/admin/credentials - Update admin username and/or password
+router.put('/credentials', isAdmin, async (req, res) => {
+  const { current_password, new_username, new_password } = req.body;
+
+  if (!current_password) {
+    return res.status(400).json({ error: 'Password lama wajib diisi untuk konfirmasi.' });
+  }
+  if (!new_username && !new_password) {
+    return res.status(400).json({ error: 'Minimal satu perubahan (username atau password baru) diperlukan.' });
+  }
+
+  // Verify current password against server.js config and/or stored credentials
+  const server = require('../server');
+  const creds = readAdminCredentials();
+
+  let isCurrentValid = false;
+  if (creds.password) {
+    // Stored as bcrypt hash
+    isCurrentValid = await bcrypt.compare(current_password, creds.password);
+  } else {
+    // Plaintext in server.js (initial state)
+    isCurrentValid = (current_password === server.ADMIN_PASS);
+  }
+
+  if (!isCurrentValid) {
+    return res.status(401).json({ error: 'Password lama tidak benar.' });
+  }
+
+  const updatedCreds = { username: new_username || creds.username };
+  if (new_password && new_password.trim() !== '') {
+    updatedCreds.password = await bcrypt.hash(new_password, 10);
+  } else {
+    updatedCreds.password = creds.password; // keep existing hash
+  }
+
+  writeAdminCredentials(updatedCreds);
+  return res.json({ message: 'Kredensial admin berhasil diperbarui. Silakan login kembali.' });
 });
 
 module.exports = router;

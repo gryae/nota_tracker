@@ -56,6 +56,40 @@
             </form>
           </div>
         </div>
+
+        <!-- Admin Credentials Card -->
+        <div class="glass-card" style="margin-top: 1.5rem;">
+          <div class="glass-card-header">
+            <h2>🔐 Ubah Kredensial Admin</h2>
+          </div>
+          <div style="padding: 0 1rem 1rem; margin-top: -0.5rem;">
+            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.45;">
+              Ubah username dan/atau password akun Administrator. Username saat ini: <strong id="currentAdminUsername" style="color: var(--accent);">—</strong>
+            </p>
+            <form id="credentialForm">
+              <div class="form-group">
+                <label for="credCurrentPassword">Password Saat Ini</label>
+                <input type="password" id="credCurrentPassword" class="input-control" required placeholder="Masukkan password lama untuk konfirmasi">
+              </div>
+              <div class="form-group">
+                <label for="credNewUsername">Username Baru (Opsional)</label>
+                <input type="text" id="credNewUsername" class="input-control" placeholder="Kosongkan jika tidak ingin mengubah">
+              </div>
+              <div class="form-group">
+                <label for="credNewPassword">Password Baru (Opsional)</label>
+                <input type="password" id="credNewPassword" class="input-control" placeholder="Kosongkan jika tidak ingin mengubah">
+              </div>
+              <div class="form-group">
+                <label for="credConfirmPassword">Konfirmasi Password Baru</label>
+                <input type="password" id="credConfirmPassword" class="input-control" placeholder="Ulangi password baru">
+              </div>
+              <button type="submit" class="btn btn-primary" style="width: 100%; height: 40px; font-weight: 700; margin-top: 0.5rem;">
+                💾 Simpan Kredensial
+              </button>
+            </form>
+          </div>
+        </div>
+
       </div>
 
       <!-- RIGHT COLUMN: Selected Division Details & Processes -->
@@ -165,6 +199,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       loadDivisions();
+      loadCurrentAdminUsername();
 
       // Bind events
       document.getElementById('addDivisiBtn').addEventListener('click', () => openDivisiModal());
@@ -172,7 +207,58 @@
       document.getElementById('divisiForm').addEventListener('submit', handleDivisiSubmit);
       document.getElementById('prosesForm').addEventListener('submit', handleProsesSubmit);
       document.getElementById('purgeForm').addEventListener('submit', handlePurgeSubmit);
+      document.getElementById('credentialForm').addEventListener('submit', handleCredentialSubmit);
     });
+
+    // --- ADMIN CREDENTIALS ---
+
+    async function loadCurrentAdminUsername() {
+      try {
+        const res = await apiFetch('/api/admin/credentials');
+        if (res && res.username) {
+          document.getElementById('currentAdminUsername').textContent = res.username;
+          document.getElementById('credNewUsername').placeholder = `Username saat ini: ${res.username}`;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function handleCredentialSubmit(e) {
+      e.preventDefault();
+      const current_password = document.getElementById('credCurrentPassword').value;
+      const new_username = document.getElementById('credNewUsername').value.trim();
+      const new_password = document.getElementById('credNewPassword').value;
+      const confirm_password = document.getElementById('credConfirmPassword').value;
+
+      if (new_password && new_password !== confirm_password) {
+        Toast.show('Konfirmasi password baru tidak cocok.', 'error');
+        return;
+      }
+      if (!new_username && !new_password) {
+        Toast.show('Masukkan username baru atau password baru.', 'error');
+        return;
+      }
+
+      try {
+        const res = await apiFetch('/api/admin/credentials', {
+          method: 'PUT',
+          body: JSON.stringify({ current_password, new_username, new_password })
+        });
+        if (res && res.message) {
+          Toast.show(res.message, 'success');
+          document.getElementById('credentialForm').reset();
+          loadCurrentAdminUsername();
+          // If username changed, suggest re-login
+          if (new_username) {
+            setTimeout(() => Auth.logout(), 2500);
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
 
     // --- DIVISI ACTIONS ---
 

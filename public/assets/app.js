@@ -151,16 +151,15 @@ async function apiFetch(endpoint, options = {}) {
   try {
     const response = await fetch(endpoint, fetchOptions);
     
-    // Handle HTTP errors
-    if (response.status === 401 || response.status === 403) {
-      // If we are not on the login page, redirect to login
+    // Handle 401 Unauthorized — redirect to login
+    if (response.status === 401) {
       if (!window.location.pathname.endsWith('index.html') && window.location.pathname !== '/') {
         Auth.logout();
         return null;
       }
     }
 
-    // Handle CSV or file downloads
+    // Handle CSV or file downloads — return raw text
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('text/csv')) {
       return response.text();
@@ -173,6 +172,7 @@ async function apiFetch(endpoint, options = {}) {
     }
     
     return data;
+
   } catch (err) {
     Toast.show(err.message, 'error');
     throw err;

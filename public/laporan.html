@@ -248,6 +248,12 @@
       });
 
       document.getElementById('exportCsvBtn').addEventListener('click', handleExportCsv);
+
+      // Live / instant search on nota filter (no Enter needed)
+      document.getElementById('noNotaFilter').addEventListener('input', () => {
+        clearTimeout(window._notaSearchTimer);
+        window._notaSearchTimer = setTimeout(() => loadLaporanData(), 400);
+      });
     });
 
     function switchTab(tabId) {
@@ -444,16 +450,30 @@
       if (dari) q.set('dari', dari);
       if (sampai) q.set('sampai', sampai);
 
+      const btn = document.getElementById('exportCsvBtn');
+      btn.disabled = true;
+      btn.textContent = 'Mengunduh...';
+
       try {
-        const csvText = await apiFetch(`/api/laporan/export-csv?${q.toString()}`);
-        if (!csvText) return;
-        
-        // Add UTF-8 BOM for Excel compatibility and set correct MIME type
+        // Use direct fetch to avoid apiFetch JSON parsing interference on CSV
+        const token = Auth.getToken();
+        const response = await fetch(`/api/laporan/export-csv?${q.toString()}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ error: 'Gagal mengekspor CSV.' }));
+          Toast.show(err.error || 'Gagal mengekspor CSV.', 'error');
+          return;
+        }
+
+        const csvText = await response.text();
+        // Add UTF-8 BOM for Excel compatibility
         const blob = new Blob(['\uFEFF' + csvText], { type: 'text/csv;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', 'laporan_nota.csv');
+        link.download = 'laporan_nota.csv';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -461,6 +481,10 @@
         Toast.show('File CSV berhasil diekspor.', 'success');
       } catch (err) {
         console.error('Gagal mengekspor CSV:', err);
+        Toast.show('Gagal mengekspor CSV.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '📥 Export CSV';
       }
     }
 
