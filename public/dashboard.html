@@ -840,6 +840,100 @@
       .panel-left { width: 100%; max-width: 100%; border-right: none; border-bottom: 2px solid var(--panel-border); overflow: visible; }
       .panel-right { height: 600px; }
     }
+
+    /* =====================================================
+       MOBILE MODE — simplified single-panel layout
+       ===================================================== */
+    body.mode-mobile {
+      overflow: auto;
+      height: auto;
+    }
+    body.mode-mobile .workspace-layout {
+      height: auto;
+      min-height: 100vh;
+    }
+    body.mode-mobile .workspace-body {
+      flex-direction: column;
+      overflow: visible;
+    }
+    body.mode-mobile .panel-left {
+      width: 100%;
+      max-width: 100%;
+      border-right: none;
+      border-bottom: none;
+      overflow: visible;
+    }
+    body.mode-mobile .panel-right {
+      display: none !important;
+    }
+    body.mode-mobile .nota-search-box {
+      display: none !important;
+    }
+    /* Mobile: big bold process cards */
+    body.mode-mobile .proses-grid-compact {
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+    body.mode-mobile .proses-card-compact {
+      min-height: 80px;
+      padding: 1.1rem 1.25rem;
+      border-radius: 10px;
+      border-width: 2px;
+      gap: 1rem;
+    }
+    body.mode-mobile .proses-card-compact .badge-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 800;
+    }
+    body.mode-mobile .proses-card-compact .proses-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    body.mode-mobile .proses-card-compact.active {
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+    }
+    /* Mobile: bigger scanner input */
+    body.mode-mobile .scanner-compact {
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+    body.mode-mobile .scanner-input-row .input-control {
+      height: 54px;
+      font-size: 1.15rem;
+    }
+    body.mode-mobile .scanner-input-row .btn-submit-scan {
+      height: 54px;
+      font-size: 0.85rem;
+      padding: 0 1.25rem;
+    }
+    body.mode-mobile .scanner-proses-name {
+      font-size: 1.25rem;
+    }
+    /* Mobile: mode badge in navbar */
+    .mode-badge {
+      display: none;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.65rem;
+      border: 1px solid rgba(56,189,248,0.3);
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(56,189,248,0.06);
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .mode-badge:hover { background: rgba(56,189,248,0.12); }
+    body.mode-mobile .mode-badge { display: inline-flex; }
   </style>
 </head>
 <body>
@@ -852,6 +946,8 @@
       </div>
       <div class="nav-user">
         <!-- Populated by app.js -->
+        <!-- Mode badge (only visible in mobile mode) -->
+        <a href="index.html" class="mode-badge" title="Klik untuk ganti mode tampilan">📱 Mobile Mode</a>
       </div>
     </nav>
 
@@ -1096,6 +1192,12 @@
       } catch (e) {
         console.warn('Audio Context beep failed:', e);
       }
+    }
+
+    // ── MODE DETECTION ── Apply mobile class before anything renders
+    const DISPLAY_MODE = localStorage.getItem('nota_display_mode') || 'desktop';
+    if (DISPLAY_MODE === 'mobile') {
+      document.body.classList.add('mode-mobile');
     }
 
     // ── AUTH CHECK ──
