@@ -41,27 +41,34 @@ router.post('/scan', async (req, res) => {
     }
 
     const targetProses = processRows[0];
-    if (targetProses.divisi_id !== divisi_id) {
+    const isArsipProses = targetProses.nama_proses.toUpperCase().includes('ARSIP');
+
+    // ARSIP processes can be performed by any authenticated division user
+    // For all other processes, enforce that it belongs to the user's own division
+    if (!isArsipProses && targetProses.divisi_id !== divisi_id) {
       return res.status(403).json({ error: 'Akses ditolak. Proses ini tidak berada di divisi Anda.' });
     }
 
     // Enforce sequential scanning: First process of the division must be completed first
-    const divisionProcesses = await db.query(
-      'SELECT id, nama_proses FROM proses WHERE divisi_id = ? ORDER BY urutan ASC, id ASC LIMIT 1',
-      [divisi_id]
-    );
+    // Skip sequential check for ARSIP processes (they can be done cross-division)
+    if (!isArsipProses) {
+      const divisionProcesses = await db.query(
+        'SELECT id, nama_proses FROM proses WHERE divisi_id = ? ORDER BY urutan ASC, id ASC LIMIT 1',
+        [divisi_id]
+      );
 
-    if (divisionProcesses.length > 0) {
-      const firstProses = divisionProcesses[0];
-      if (Number(proses_id) !== firstProses.id) {
-        const firstScanHistory = await db.query(
-          'SELECT id FROM scan_log WHERE no_nota = ? AND proses_id = ? LIMIT 1',
-          [cleanNota, firstProses.id]
-        );
-        if (firstScanHistory.length === 0) {
-          return res.status(400).json({
-            error: `Gagal memproses. Nota [${cleanNota}] harus melalui proses pertama divisi ini (${firstProses.nama_proses}) terlebih dahulu.`
-          });
+      if (divisionProcesses.length > 0) {
+        const firstProses = divisionProcesses[0];
+        if (Number(proses_id) !== firstProses.id) {
+          const firstScanHistory = await db.query(
+            'SELECT id FROM scan_log WHERE no_nota = ? AND proses_id = ? LIMIT 1',
+            [cleanNota, firstProses.id]
+          );
+          if (firstScanHistory.length === 0) {
+            return res.status(400).json({
+              error: `Gagal memproses. Nota [${cleanNota}] harus melalui proses pertama divisi ini (${firstProses.nama_proses}) terlebih dahulu.`
+            });
+          }
         }
       }
     }

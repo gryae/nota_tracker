@@ -276,13 +276,33 @@ router.get('/export-csv', async (req, res) => {
       }
     }));
 
-    // CSV header
-    let csvContent = 'No,No Nota,Divisi,Proses,Tanggal,Jam,Status Tertahan\r\n';
+    // Optional status filter (Aktif / Perlu Perhatian / Tertahan)
+    const statusFilter = req.query.status ? req.query.status.trim() : '';
 
-    rows.forEach((r, idx) => {
+    // CSV header
+    let csvContent = 'No,No Nota,Divisi,Proses,Tanggal,Jam,Status\r\n';
+
+    let rowNum = 0;
+    // Build unique nota summary rows (one row per nota, showing latest step)
+    // First, group rows by no_nota keeping only the last scan per nota
+    const latestRowPerNota = {};
+    rows.forEach(r => {
+      if (!latestRowPerNota[r.no_nota] || new Date(r.scanned_at) > new Date(latestRowPerNota[r.no_nota].scanned_at)) {
+        latestRowPerNota[r.no_nota] = r;
+      }
+    });
+
+    for (const no_nota of uniqueNotas) {
+      const r = latestRowPerNota[no_nota];
+      if (!r) continue;
+
+      const noteStatus = statusMap[no_nota] || { status: 'Aktif' };
+
+      // Apply status filter if provided
+      if (statusFilter && noteStatus.status !== statusFilter) continue;
+
+      rowNum++;
       const { tanggal, jam } = parseDateTime(r.scanned_at);
-      const noteStatus = statusMap[r.no_nota] || { status: 'Aktif' };
-      const isStuck24h = noteStatus.status === 'Tertahan' ? 'YA' : 'TIDAK';
 
       // Helper to escape values in CSV
       const escape = (val) => {
@@ -290,8 +310,8 @@ router.get('/export-csv', async (req, res) => {
         return str.includes(',') ? `"${str.replace(/"/g, '""')}"` : str;
       };
 
-      csvContent += `${idx + 1},${escape(r.no_nota)},${escape(r.nama_divisi)},${escape(r.nama_proses)},${tanggal},${jam},${isStuck24h}\r\n`;
-    });
+      csvContent += `${rowNum},${escape(no_nota)},${escape(r.nama_divisi)},${escape(r.nama_proses)},${tanggal},${jam},${escape(noteStatus.status)}\r\n`;
+    }
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="laporan_nota.csv"');

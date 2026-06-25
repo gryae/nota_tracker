@@ -1725,6 +1725,7 @@
       if (no_nota) q.set('no_nota', no_nota);
       if (dari) q.set('dari', dari);
       if (sampai) q.set('sampai', sampai);
+      if (activeStatusFilter) q.set('status', activeStatusFilter);
 
       const btn = document.getElementById('exportCsvBtn');
       btn.disabled = true;
