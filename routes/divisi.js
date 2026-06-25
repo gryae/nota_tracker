@@ -90,6 +90,23 @@ router.post('/scan', async (req, res) => {
       }
     }
 
+    // 1c. Safeguard: If the target process is CETAK, verify that CETAK has NOT been performed yet.
+    if (targetProses.nama_proses.trim().toUpperCase() === 'CETAK') {
+      const cetakHistory = await db.query(
+        `SELECT s.id, s.scanned_at FROM scan_log s
+         INNER JOIN proses p ON s.proses_id = p.id
+         WHERE s.no_nota = ? AND p.nama_proses = 'CETAK'
+         LIMIT 1`,
+        [cleanNota]
+      );
+      if (cetakHistory.length > 0) {
+        const scanTime = formatDateTime(cetakHistory[0].scanned_at);
+        return res.status(400).json({
+          error: `Gagal memproses. Nota [${cleanNota}] sudah pernah dicetak pada [${scanTime}].`
+        });
+      }
+    }
+
     // 2. Check for duplicate scan: unique key (no_nota, proses_id)
     const existingScan = await db.query(
       'SELECT id, scanned_at FROM scan_log WHERE no_nota = ? AND proses_id = ?',
