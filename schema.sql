@@ -29,6 +29,14 @@ CREATE TABLE IF NOT EXISTS scan_log (
   proses_id   INT NOT NULL,
   scanned_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY unique_nota_proses (no_nota, proses_id),
+  KEY idx_scan_log_no_nota (no_nota),
+  KEY idx_scan_log_scanned_at (scanned_at),
+  KEY idx_scan_log_divisi_id (divisi_id),
   FOREIGN KEY (divisi_id) REFERENCES divisi(id) ON DELETE CASCADE,
   FOREIGN KEY (proses_id) REFERENCES proses(id) ON DELETE CASCADE
 );
+
+-- Run these manually if the table already exists:
+-- CREATE INDEX idx_scan_log_no_nota ON scan_log(no_nota);
+-- CREATE INDEX idx_scan_log_scanned_at ON scan_log(scanned_at);
+-- CREATE INDEX idx_scan_log_divisi_id ON scan_log(divisi_id);

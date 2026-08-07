@@ -103,6 +103,28 @@ async function initDb() {
       console.warn('Migration warning conversion from hours to minutes failed:', e.message);
     }
 
+    // Auto-add performance indexes on scan_log if they don't exist
+    const indexMigrations = [
+      { name: 'idx_scan_log_no_nota',    sql: 'CREATE INDEX idx_scan_log_no_nota ON scan_log(no_nota)' },
+      { name: 'idx_scan_log_scanned_at', sql: 'CREATE INDEX idx_scan_log_scanned_at ON scan_log(scanned_at)' },
+      { name: 'idx_scan_log_divisi_id',  sql: 'CREATE INDEX idx_scan_log_divisi_id ON scan_log(divisi_id)' }
+    ];
+    for (const idx of indexMigrations) {
+      try {
+        const [existing] = await conn.execute(
+          `SELECT COUNT(*) as cnt FROM information_schema.statistics
+           WHERE table_schema = DATABASE() AND table_name = 'scan_log' AND index_name = ?`,
+          [idx.name]
+        );
+        if (existing[0].cnt === 0) {
+          await conn.execute(idx.sql);
+          console.log(`🌱 Migration: Index "${idx.name}" added to scan_log.`);
+        }
+      } catch (e) {
+        console.warn(`Migration warning: could not add index "${idx.name}":`, e.message);
+      }
+    }
+
     conn.release();
     isFallbackActive = false;
   } catch (err) {

@@ -159,11 +159,14 @@ router.get('/scan/today', async (req, res) => {
   }
 });
 
-// GET /api/divisi/scan/nota-list - Get unique list of existing scanned notas
+// GET /api/divisi/scan/nota-list - Get unique list of recently scanned notas (last 60 days)
+// Dibatasi 60 hari terakhir untuk performa — hindari full-scan 38K+ rows untuk autocomplete
 router.get('/scan/nota-list', async (req, res) => {
   try {
     const rows = await db.query(
-      'SELECT DISTINCT no_nota FROM scan_log ORDER BY no_nota ASC'
+      `SELECT DISTINCT no_nota FROM scan_log
+       WHERE scanned_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
+       ORDER BY no_nota ASC`
     );
     return res.json(rows.map(r => r.no_nota));
   } catch (err) {

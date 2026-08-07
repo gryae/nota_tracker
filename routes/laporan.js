@@ -25,89 +25,150 @@ function parseDateTime(dateVal) {
   };
 }
 
-// Helper to calculate status of a single nota inside its current division
-async function getNotaStatus(no_nota, divisi_id, limit_perhatian, limit_tertahan, latest_scanned_at) {
-  try {
-    // 1. Get all processes of this latest division
-    const processes = await db.query(
-      'SELECT id, nama_proses, urutan FROM proses WHERE divisi_id = ? ORDER BY urutan ASC, id ASC',
-      [divisi_id]
-    );
-    if (processes.length === 0) {
-      return { status: 'Aktif', hours_elapsed: 0, badge: '🟢' };
+/**
+ * Bulk approach: dapatkan status semua nota sekaligus dengan minimal DB queries.
+ * Menggantikan getNotaStatus() yang lama (N+1 query problem).
+ *
+ * @param {Array} notaInfoList - array of { no_nota, divisi_id, limit_perhatian, limit_tertahan, scanned_at }
+ * @param {Array} allProcesses - semua rows dari tabel proses (sudah di-fetch sekali)
+ * @param {Array} relevantScans - scan_log rows yang relevan (sudah di-fetch sekali)
+ * @returns {Object} map: no_nota => { status, hours_elapsed, badge }
+ */
+function getBulkNotaStatuses(notaInfoList, allProcesses, relevantScans) {
+  // Build fast lookup maps
+  const processesByDivisi = {};
+  allProcesses.forEach(p => {
+    if (!processesByDivisi[p.divisi_id]) processesByDivisi[p.divisi_id] = [];
+    processesByDivisi[p.divisi_id].push(p);
+  });
+  // Sort each divisi's processes by urutan
+  Object.values(processesByDivisi).forEach(arr => arr.sort((a, b) => a.urutan - b.urutan || a.id - b.id));
+
+  // Build scan lookup: { proses_id: { no_nota: scanned_at } }
+  const scanByProsesNota = {};
+  relevantScans.forEach(s => {
+    const key = `${s.proses_id}__${s.no_nota}`;
+    if (!scanByProsesNota[key] || new Date(s.scanned_at) < new Date(scanByProsesNota[key])) {
+      scanByProsesNota[key] = s.scanned_at;
     }
-    
+  });
+  // Also build by divisi_nota for fallback (oldest scan per divisi+nota)
+  const oldestScanByDivisiNota = {};
+  relevantScans.forEach(s => {
+    const key = `${s.divisi_id}__${s.no_nota}`;
+    if (!oldestScanByDivisiNota[key] || new Date(s.scanned_at) < new Date(oldestScanByDivisiNota[key])) {
+      oldestScanByDivisiNota[key] = s.scanned_at;
+    }
+  });
+
+  const statusMap = {};
+
+  for (const info of notaInfoList) {
+    const { no_nota, divisi_id, limit_perhatian, limit_tertahan, scanned_at } = info;
+    const processes = processesByDivisi[divisi_id] || [];
+
+    if (processes.length === 0) {
+      statusMap[no_nota] = { status: 'Aktif', hours_elapsed: 0, badge: '🟢' };
+      continue;
+    }
+
     const firstProses = processes[0];
     const lastProses = processes[processes.length - 1];
 
-    // 2. Find the first process scan in this division
-    const firstScans = await db.query(
-      'SELECT scanned_at FROM scan_log WHERE no_nota = ? AND proses_id = ? LIMIT 1',
-      [no_nota, firstProses.id]
-    );
-
+    // Find tFirst
+    const firstScanKey = `${firstProses.id}__${no_nota}`;
     let tFirst;
-    if (firstScans.length > 0) {
-      tFirst = new Date(firstScans[0].scanned_at).getTime();
+    if (scanByProsesNota[firstScanKey]) {
+      tFirst = new Date(scanByProsesNota[firstScanKey]).getTime();
     } else {
-      // Fallback: use oldest scan of this note in this division
-      const oldestScans = await db.query(
-        'SELECT scanned_at FROM scan_log WHERE no_nota = ? AND divisi_id = ? ORDER BY scanned_at ASC LIMIT 1',
-        [no_nota, divisi_id]
-      );
-      tFirst = oldestScans.length > 0 ? new Date(oldestScans[0].scanned_at).getTime() : new Date(latest_scanned_at).getTime();
+      const fallbackKey = `${divisi_id}__${no_nota}`;
+      tFirst = oldestScanByDivisiNota[fallbackKey]
+        ? new Date(oldestScanByDivisiNota[fallbackKey]).getTime()
+        : new Date(scanned_at).getTime();
     }
 
-    // 3. Check if last process of this division is scanned
-    const lastScans = await db.query(
-      'SELECT scanned_at FROM scan_log WHERE no_nota = ? AND proses_id = ? LIMIT 1',
-      [no_nota, lastProses.id]
-    );
-
-    if (lastScans.length > 0) {
-      // Completed in this division
-      const tLast = new Date(lastScans[0].scanned_at).getTime();
+    // Check last process
+    const lastScanKey = `${lastProses.id}__${no_nota}`;
+    if (scanByProsesNota[lastScanKey]) {
+      const tLast = new Date(scanByProsesNota[lastScanKey]).getTime();
       const minutesElapsed = (tLast - tFirst) / (1000 * 60);
-      return { 
-        status: 'Aktif', 
-        hours_elapsed: Number((minutesElapsed / 60).toFixed(1)), 
-        badge: '🟢' 
+      statusMap[no_nota] = {
+        status: 'Aktif',
+        hours_elapsed: Number((minutesElapsed / 60).toFixed(1)),
+        badge: '🟢'
       };
     } else {
-      // Still in progress
       const minutesElapsed = (Date.now() - tFirst) / (1000 * 60);
-      let status = 'Aktif';
-      let badge = '🟢';
-      const limitPerhatian = limit_perhatian !== undefined ? Number(limit_perhatian) : 240;
-      const limitTertahan = limit_tertahan !== undefined ? Number(limit_tertahan) : 1440;
-
-      if (minutesElapsed > limitTertahan) {
-        status = 'Tertahan';
-        badge = '🔴';
-      } else if (minutesElapsed > limitPerhatian) {
-        status = 'Perlu Perhatian';
-        badge = '🟡';
-      }
-      return { 
-        status, 
-        hours_elapsed: Number((minutesElapsed / 60).toFixed(1)), 
-        badge 
+      const limitP = limit_perhatian !== undefined ? Number(limit_perhatian) : 240;
+      const limitT = limit_tertahan !== undefined ? Number(limit_tertahan) : 1440;
+      let status = 'Aktif', badge = '🟢';
+      if (minutesElapsed > limitT) { status = 'Tertahan'; badge = '🔴'; }
+      else if (minutesElapsed > limitP) { status = 'Perlu Perhatian'; badge = '🟡'; }
+      statusMap[no_nota] = {
+        status,
+        hours_elapsed: Number((minutesElapsed / 60).toFixed(1)),
+        badge
       };
     }
-  } catch (err) {
-    console.error('Error in getNotaStatus:', err);
-    return { status: 'Aktif', hours_elapsed: 0, badge: '🟢' };
   }
+
+  return statusMap;
 }
 
-// Helper to generate filtered query
+/**
+ * Fetch all processes and relevant scan_log rows for a set of nota numbers.
+ * Returns { allProcesses, relevantScans } — dipakai untuk getBulkNotaStatuses().
+ */
+async function fetchBulkStatusData(notaNumbers) {
+  if (notaNumbers.length === 0) return { allProcesses: [], relevantScans: [] };
+
+  const [allProcesses, relevantScans] = await Promise.all([
+    db.query('SELECT id, divisi_id, nama_proses, urutan FROM proses ORDER BY urutan ASC, id ASC'),
+    db.query(
+      `SELECT proses_id, divisi_id, no_nota, MIN(scanned_at) as scanned_at
+       FROM scan_log
+       WHERE no_nota IN (${notaNumbers.map(() => '?').join(',')})
+       GROUP BY proses_id, divisi_id, no_nota`,
+      notaNumbers
+    )
+  ]);
+
+  return { allProcesses, relevantScans };
+}
+
+// Helper to generate filtered query (optimized: no correlated subquery)
 function buildFilteredQuery(filters) {
   const { dari, sampai, no_nota, divisi_id } = filters;
 
-  let sql = `
+  // Use a default 30-day window if no date filter specified to avoid full table scan
+  const defaultDari = dari || (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  })();
+  const defaultSampai = sampai || new Date().toISOString().split('T')[0];
+
+  // Step 1: Build inner CTE/subquery to get matching no_notas first using indexed columns
+  let innerWhere = 'WHERE scanned_at >= ? AND scanned_at <= ?';
+  const innerParams = [`${defaultDari} 00:00:00`, `${defaultSampai} 23:59:59`];
+
+  if (no_nota) {
+    innerWhere += ' AND no_nota LIKE ?';
+    innerParams.push(`%${no_nota.trim()}%`);
+  }
+  if (divisi_id) {
+    innerWhere += ' AND divisi_id = ?';
+    innerParams.push(Number(divisi_id));
+  }
+
+  // Optimized: JOIN-based approach, no correlated subquery
+  const sql = `
     SELECT s.id, s.no_nota, d.nama_divisi, p.nama_proses, s.scanned_at,
            latest.latest_scanned_at, d.id as divisi_id, d.limit_perhatian, d.limit_tertahan, s.proses_id
-    FROM scan_log s
+    FROM (
+      SELECT DISTINCT no_nota FROM scan_log ${innerWhere}
+    ) matched
+    INNER JOIN scan_log s ON s.no_nota = matched.no_nota
     INNER JOIN divisi d ON s.divisi_id = d.id
     INNER JOIN proses p ON s.proses_id = p.id
     INNER JOIN (
@@ -115,51 +176,25 @@ function buildFilteredQuery(filters) {
       FROM scan_log
       GROUP BY no_nota
     ) latest ON s.no_nota = latest.no_nota
-    WHERE s.no_nota IN (
-      SELECT DISTINCT no_nota FROM scan_log WHERE 1=1
-  `;
-
-  const params = [];
-
-  if (dari) {
-    sql += ` AND scanned_at >= ?`;
-    params.push(`${dari} 00:00:00`);
-  }
-  if (sampai) {
-    sql += ` AND scanned_at <= ?`;
-    params.push(`${sampai} 23:59:59`);
-  }
-  if (no_nota) {
-    sql += ` AND no_nota LIKE ?`;
-    params.push(`%${no_nota.trim()}%`);
-  }
-  if (divisi_id) {
-    sql += ` AND divisi_id = ?`;
-    params.push(Number(divisi_id));
-  }
-
-  sql += `
-    )
     ORDER BY s.no_nota ASC, s.scanned_at ASC
   `;
 
-  return { sql, params };
+  return { sql, params: innerParams, dateFiltered: { dari: defaultDari, sampai: defaultSampai } };
 }
 
 // GET /api/laporan/nota - Laporan dengan filter
 router.get('/nota', async (req, res) => {
   try {
-    const { sql, params } = buildFilteredQuery(req.query);
+    const { sql, params, dateFiltered } = buildFilteredQuery(req.query);
     const rows = await db.query(sql, params);
 
-    // Group rows by no_nota to identify unique notes and find their latest step
-    const uniqueNotas = [...new Set(rows.map(r => r.no_nota))];
+    if (rows.length === 0) {
+      return res.json([]);
+    }
 
-    // Build map of latest division and thresholds for each nota
+    // Build map of latest division info per nota (last row = latest since sorted ASC)
     const latestDivMap = {};
     rows.forEach(r => {
-      // Since rows are ordered by no_nota ASC, scanned_at ASC, 
-      // the last encountered row for a note is its latest step.
       latestDivMap[r.no_nota] = {
         divisi_id: r.divisi_id,
         limit_perhatian: r.limit_perhatian,
@@ -168,26 +203,16 @@ router.get('/nota', async (req, res) => {
       };
     });
 
-    const statusMap = {};
-    await Promise.all(uniqueNotas.map(async (no_nota) => {
-      const divInfo = latestDivMap[no_nota];
-      if (divInfo) {
-        const noteStatus = await getNotaStatus(
-          no_nota,
-          divInfo.divisi_id,
-          divInfo.limit_perhatian,
-          divInfo.limit_tertahan,
-          divInfo.scanned_at
-        );
-        statusMap[no_nota] = noteStatus;
-      }
-    }));
+    const uniqueNotas = Object.keys(latestDivMap);
+    const notaInfoList = uniqueNotas.map(n => ({ no_nota: n, ...latestDivMap[n] }));
+
+    // Bulk fetch — only 2 queries regardless of how many notas
+    const { allProcesses, relevantScans } = await fetchBulkStatusData(uniqueNotas);
+    const statusMap = getBulkNotaStatuses(notaInfoList, allProcesses, relevantScans);
 
     const processedRows = rows.map(r => {
       const { tanggal, jam } = parseDateTime(r.scanned_at);
       const noteStatus = statusMap[r.no_nota] || { status: 'Aktif' };
-      const isStuck24h = noteStatus.status === 'Tertahan';
-
       return {
         id: r.id,
         no_nota: r.no_nota,
@@ -196,7 +221,7 @@ router.get('/nota', async (req, res) => {
         scanned_at: r.scanned_at,
         tanggal,
         jam,
-        isStuck24h
+        isStuck24h: noteStatus.status === 'Tertahan'
       };
     });
 
@@ -247,10 +272,6 @@ router.get('/export-csv', async (req, res) => {
     const { sql, params } = buildFilteredQuery(req.query);
     const rows = await db.query(sql, params);
 
-    // Group rows by no_nota to identify unique notes and find their latest step
-    const uniqueNotas = [...new Set(rows.map(r => r.no_nota))];
-
-    // Build map of latest division and thresholds for each nota
     const latestDivMap = {};
     rows.forEach(r => {
       latestDivMap[r.no_nota] = {
@@ -261,20 +282,12 @@ router.get('/export-csv', async (req, res) => {
       };
     });
 
-    const statusMap = {};
-    await Promise.all(uniqueNotas.map(async (no_nota) => {
-      const divInfo = latestDivMap[no_nota];
-      if (divInfo) {
-        const noteStatus = await getNotaStatus(
-          no_nota,
-          divInfo.divisi_id,
-          divInfo.limit_perhatian,
-          divInfo.limit_tertahan,
-          divInfo.scanned_at
-        );
-        statusMap[no_nota] = noteStatus;
-      }
-    }));
+    const uniqueNotas = Object.keys(latestDivMap);
+    const notaInfoList = uniqueNotas.map(n => ({ no_nota: n, ...latestDivMap[n] }));
+
+    // Bulk fetch — only 2 queries regardless of how many notas
+    const { allProcesses, relevantScans } = await fetchBulkStatusData(uniqueNotas);
+    const statusMap = getBulkNotaStatuses(notaInfoList, allProcesses, relevantScans);
 
     // Optional status filter (Aktif / Perlu Perhatian / Tertahan)
     const statusFilter = req.query.status ? req.query.status.trim() : '';
@@ -283,8 +296,6 @@ router.get('/export-csv', async (req, res) => {
     let csvContent = 'No,No Nota,Divisi,Proses,Tanggal,Jam,Status\r\n';
 
     let rowNum = 0;
-    // Build unique nota summary rows (one row per nota, showing latest step)
-    // First, group rows by no_nota keeping only the last scan per nota
     const latestRowPerNota = {};
     rows.forEach(r => {
       if (!latestRowPerNota[r.no_nota] || new Date(r.scanned_at) > new Date(latestRowPerNota[r.no_nota].scanned_at)) {
@@ -292,24 +303,20 @@ router.get('/export-csv', async (req, res) => {
       }
     });
 
+    const escape = (val) => {
+      const str = String(val);
+      return str.includes(',') ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+
     for (const no_nota of uniqueNotas) {
       const r = latestRowPerNota[no_nota];
       if (!r) continue;
 
       const noteStatus = statusMap[no_nota] || { status: 'Aktif' };
-
-      // Apply status filter if provided
       if (statusFilter && noteStatus.status !== statusFilter) continue;
 
       rowNum++;
       const { tanggal, jam } = parseDateTime(r.scanned_at);
-
-      // Helper to escape values in CSV
-      const escape = (val) => {
-        const str = String(val);
-        return str.includes(',') ? `"${str.replace(/"/g, '""')}"` : str;
-      };
-
       csvContent += `${rowNum},${escape(no_nota)},${escape(r.nama_divisi)},${escape(r.nama_proses)},${tanggal},${jam},${escape(noteStatus.status)}\r\n`;
     }
 
@@ -323,9 +330,34 @@ router.get('/export-csv', async (req, res) => {
 });
 
 // GET /api/laporan/summary - Summary status semua nota aktif
+// Query param: ?days=N (default 30) untuk batasi window waktu, ?all=1 untuk semua data
 router.get('/summary', async (req, res) => {
   try {
-    // MySQL query to fetch the absolute latest scan for each unique no_nota
+    // Default: hanya tampilkan nota yang ada aktivitas dalam 30 hari terakhir
+    // Ini mencegah full-scan 38K+ rows setiap kali summary dibuka
+    const showAll = req.query.all === '1';
+    const days = parseInt(req.query.days) || 30;
+
+    let dateFilter = '';
+    const dateParams = [];
+    if (!showAll) {
+      dateFilter = 'WHERE s.scanned_at >= DATE_SUB(NOW(), INTERVAL ? DAY)';
+      dateParams.push(days);
+    }
+
+    // Step 1: Get distinct nota numbers within the time window (uses scanned_at index)
+    const matchedNotas = await db.query(
+      `SELECT DISTINCT no_nota FROM scan_log s ${dateFilter}`,
+      dateParams
+    );
+
+    if (matchedNotas.length === 0) {
+      return res.json([]);
+    }
+
+    const notaNumbers = matchedNotas.map(r => r.no_nota);
+
+    // Step 2: Get latest scan per nota (uses no_nota index)
     const rows = await db.query(
       `SELECT s.no_nota, s.scanned_at, d.nama_divisi, p.nama_proses,
               d.id as divisi_id, d.limit_perhatian, d.limit_tertahan, s.proses_id
@@ -333,17 +365,29 @@ router.get('/summary', async (req, res) => {
        INNER JOIN (
          SELECT no_nota, MAX(id) as max_id
          FROM scan_log
+         WHERE no_nota IN (${notaNumbers.map(() => '?').join(',')})
          GROUP BY no_nota
        ) latest ON s.id = latest.max_id
        INNER JOIN divisi d ON s.divisi_id = d.id
        INNER JOIN proses p ON s.proses_id = p.id
-       ORDER BY s.scanned_at DESC`
+       ORDER BY s.scanned_at DESC`,
+      notaNumbers
     );
 
-    const summary = await Promise.all(rows.map(async (r) => {
-      const { tanggal, jam } = parseDateTime(r.scanned_at);
-      const noteStatus = await getNotaStatus(r.no_nota, r.divisi_id, r.limit_perhatian, r.limit_tertahan, r.scanned_at);
+    // Step 3: Bulk status computation — hanya 2 DB queries total untuk semua nota
+    const notaInfoList = rows.map(r => ({
+      no_nota: r.no_nota,
+      divisi_id: r.divisi_id,
+      limit_perhatian: r.limit_perhatian,
+      limit_tertahan: r.limit_tertahan,
+      scanned_at: r.scanned_at
+    }));
+    const { allProcesses, relevantScans } = await fetchBulkStatusData(notaNumbers);
+    const statusMap = getBulkNotaStatuses(notaInfoList, allProcesses, relevantScans);
 
+    const summary = rows.map(r => {
+      const { tanggal, jam } = parseDateTime(r.scanned_at);
+      const noteStatus = statusMap[r.no_nota] || { status: 'Aktif', hours_elapsed: 0, badge: '🟢' };
       return {
         no_nota: r.no_nota,
         nama_divisi: r.nama_divisi,
@@ -355,7 +399,7 @@ router.get('/summary', async (req, res) => {
         status: noteStatus.status,
         badge: noteStatus.badge
       };
-    }));
+    });
 
     return res.json(summary);
   } catch (err) {
